@@ -1,5 +1,11 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+/**
+ * Holds properties of a video as well as optimization data.
+ * 
+ * @author Brian Rupert
+ *
+ */
 public class VideoProperties {
 
 	private String id;

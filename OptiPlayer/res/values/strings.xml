@@ -2,7 +2,13 @@
 <resources>
 
     <string name="app_name">OptiPlayer</string>
-    <string name="hello_world">Hello world!</string>
     <string name="action_settings">Settings</string>
+    
+    <string name="button_search_label">Go</string>
+    <string name="button_search_hint">Search here</string>
+    
+    <string name="list_thumb_description">Video Thumbnail</string>
+    <string name="list_default_title">Video Title</string>
+    <string name="list_default_description">Video description is very long just to verify that the longer video descriptions will act appropriately in the layout.</string>
 
 </resources>
