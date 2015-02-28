@@ -38,6 +38,7 @@
         android:layout_height="wrap_content"
         android:layout_below="@+id/button1"
         android:layout_alignParentBottom="true"
+        android:choiceMode="singleChoice"
         android:layout_marginTop="6dp" >
     </ListView>
 

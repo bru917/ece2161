@@ -4,11 +4,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
+import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
 import android.widget.ListAdapter;
 import android.widget.ListView;
@@ -20,7 +23,7 @@ import android.widget.TextView;
  * @author Brian Rupert
  *
  */
-public class MainActivity extends Activity {
+public class MainActivity extends Activity implements OnItemClickListener {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -29,6 +32,7 @@ public class MainActivity extends Activity {
 		
 		ListView listView = (ListView) findViewById(R.id.listView1);
 		listView.setAdapter(new VideoResultsListAdapter());
+		listView.setOnItemClickListener(this);
 	}
 
 	@Override
@@ -48,6 +52,16 @@ public class MainActivity extends Activity {
 			return true;
 		}
 		return super.onOptionsItemSelected(item);
+	}
+	
+	private void playVideo() {
+		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
+		startActivity(i);
+	}
+	
+	@Override
+	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+		playVideo();
 	}
 	
 	/**
@@ -74,19 +88,14 @@ public class MainActivity extends Activity {
 		
 		VideoResultsListAdapter() {
 			
-			VideoSummaryInfo test = new VideoSummaryInfo();
-			test.id = 1;
-			test.title = "Test Video Title";
-			test.description = "A video description is shown here";
-			
-			this.delegate.add(test);
-			
-			test = new VideoSummaryInfo();
-			test.id = 2;
-			test.title = "Test Video Title 2";
-			test.description = "A video description is shown here";
-			
-			this.delegate.add(test);
+			for (int i = 0; i < 10; i++) {
+				VideoSummaryInfo test = new VideoSummaryInfo();
+				test.id = 1;
+				test.title = "Test Video Title (" + i + ")";
+				test.description = "A video description is shown here";
+				
+				this.delegate.add(test);
+			}
 		}
 
 		@Override
@@ -126,4 +135,5 @@ public class MainActivity extends Activity {
 		}
 		
 	}
+
 }
