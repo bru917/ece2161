@@ -1,6 +1,8 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -12,11 +14,24 @@ import android.view.MenuItem;
  *
  */
 public class PlayVideoActivity extends Activity {
+	
+	private ProgressDialog progress;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_play_video);
+		
+		progress = new ProgressDialog(this);
+		progress.setTitle("Please wait");
+		progress.setMessage("Loading video...");
+		progress.setIndeterminate(true);
+		progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+		progress.setProgress(0);
+		progress.show();
+		
+		LoadVideoTask task = new LoadVideoTask();
+		task.execute();
 	}
 
 	@Override
@@ -37,4 +52,55 @@ public class PlayVideoActivity extends Activity {
 		}
 		return super.onOptionsItemSelected(item);
 	}
+	
+	/**
+	 * This asynchronous task can fetch the dimming scheme and load the
+	 * video file/stream.
+	 * 
+	 * @author Brian Rupert
+	 *
+	 */
+	private class LoadVideoTask extends AsyncTask<Void, Void, Void> {
+
+		@Override
+		protected Void doInBackground(Void... params) {
+			// Perform video loading...
+			
+			// Note: sleeps are here for testing only.
+			
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				
+			}
+			
+			progress.setIndeterminate(false);
+			progress.setMax(8);
+			
+			for (int i = 0; i < 8; i++) {
+				publishProgress((Void) null);
+
+				try {
+					Thread.sleep(100);
+				} catch (InterruptedException e) {
+					
+				}
+			}
+
+			return null;
+		}
+		
+		@Override
+		protected void onProgressUpdate(Void... values) {
+			// Update progress indicator.
+			progress.incrementProgressBy(1);
+	    }
+		
+		@Override
+		protected void onPostExecute(Void result) {
+			// Called when complete.
+			progress.dismiss();
+		}
+	}
+
 }
