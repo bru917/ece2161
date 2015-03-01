@@ -2,9 +2,11 @@ package edu.pitt.ece2161.spring2015.optiplayer;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
 import android.app.Activity;
+import android.app.ProgressDialog;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Menu;
@@ -28,6 +30,9 @@ import android.widget.TextView;
 public class MainActivity extends Activity implements OnItemClickListener {
 	
 	private VideoResultsListAdapter listAdapter;
+	
+	// Defined as static so the state is saved - not sure if thats a cheap trick.
+	private static List<VideoProperties> searchResultList = new ArrayList<VideoProperties>();
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -40,6 +45,12 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		listView.setAdapter(listAdapter);
 		listView.setOnItemClickListener(this);
 	}
+	
+	@Override
+	protected void onResume() {
+		super.onResume();
+		
+	};
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -60,36 +71,56 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		return super.onOptionsItemSelected(item);
 	}
 	
+	/**
+	 * Invoked when the search "Go" button is pressed.
+	 * @param view A reference to the button.
+	 */
 	public void clickSearchButton(View view) {
 		TextView txt = (TextView) findViewById(R.id.searchText);
+		String queryTerm = txt.getText().toString();
 		
-		List<VideoProperties> newlist = search(txt.getText().toString());
-		
-		listAdapter.update(newlist);
-	}
-	
-	/**
-	 * Executes the search task.
-	 * @param queryTerm
-	 * @return
-	 */
-	private List<VideoProperties> search(String queryTerm) {
-		VideoSearchTask task = new VideoSearchTask(this);
+		final ProgressDialog progress = new ProgressDialog(this);
+		final VideoSearchTask task = new VideoSearchTask(this) {
+			
+			@Override
+			protected void onPostExecute(List<VideoProperties> results) {
+				super.onPostExecute(results);
+				progress.dismiss();
+				// Clear-out the old results.
+				searchResultList.clear();
+				// Add all the new results.
+				searchResultList.addAll(results);
+				// Tell the list view to update.
+				listAdapter.notifyDataSetChanged();
+			}
+			
+			@Override
+			protected void onCancelled(List<VideoProperties> results) {
+				// Handle cancellation if needed here.
+			}
+			
+			@Override
+			protected void onProgressUpdate(Integer... values) {
+				if (values != null && values.length > 0) {
+					progress.setProgress(values[0]);
+				}
+			}
+		};
+		progress.setTitle("Searching");
+		progress.setIndeterminate(false);
+		progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+		progress.setCancelable(true);
+		progress.setMax(task.getProgressMax());
+		progress.setOnCancelListener(new OnCancelListener() {
+			@Override
+			public void onCancel(DialogInterface dialog) {
+				// User pressed 'cancel' in the progress dialog.
+				task.cancel(true);
+			}
+		});
+		progress.show();
 		
 		task.execute(queryTerm);
-		
-		List<VideoProperties> results = null;
-		try {
-			results = task.get();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (ExecutionException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		
-		return results;
 	}
 	
 	private void playVideo() {
@@ -99,6 +130,7 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+		// Invoked when a video in the search list is clicked.
 		playVideo();
 	}
 	
@@ -110,28 +142,14 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	 */
 	private class VideoResultsListAdapter extends BaseAdapter implements ListAdapter {
 		
-		private List<VideoProperties> delegate = new ArrayList<VideoProperties>();
-		
-		VideoResultsListAdapter() {
-			
-		}
-		
-		public void update(List<VideoProperties> newlist) {
-			this.delegate.clear();
-			if (newlist != null) {
-				this.delegate.addAll(newlist);
-			}
-			notifyDataSetChanged();
-		}
-
 		@Override
 		public int getCount() {
-			return delegate.size();
+			return searchResultList.size();
 		}
 
 		@Override
 		public Object getItem(int position) {
-			return delegate.get(position);
+			return searchResultList.get(position);
 		}
 
 		@Override
@@ -165,6 +183,10 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			return convertView;
 		}
 		
+	}
+
+	public void updateListView() {
+		this.listAdapter.notifyDataSetChanged();
 	}
 
 }
