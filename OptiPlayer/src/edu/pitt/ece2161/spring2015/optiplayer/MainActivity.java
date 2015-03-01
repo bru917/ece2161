@@ -2,6 +2,7 @@ package edu.pitt.ece2161.spring2015.optiplayer;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -13,6 +14,7 @@ import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
+import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -24,14 +26,18 @@ import android.widget.TextView;
  *
  */
 public class MainActivity extends Activity implements OnItemClickListener {
+	
+	private VideoResultsListAdapter listAdapter;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
-		ListView listView = (ListView) findViewById(R.id.listView1);
-		listView.setAdapter(new VideoResultsListAdapter());
+		listAdapter = new VideoResultsListAdapter();
+		
+		ListView listView = (ListView) findViewById(R.id.searchList);
+		listView.setAdapter(listAdapter);
 		listView.setOnItemClickListener(this);
 	}
 
@@ -54,6 +60,38 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		return super.onOptionsItemSelected(item);
 	}
 	
+	public void clickSearchButton(View view) {
+		TextView txt = (TextView) findViewById(R.id.searchText);
+		
+		List<VideoProperties> newlist = search(txt.getText().toString());
+		
+		listAdapter.update(newlist);
+	}
+	
+	/**
+	 * Executes the search task.
+	 * @param queryTerm
+	 * @return
+	 */
+	private List<VideoProperties> search(String queryTerm) {
+		VideoSearchTask task = new VideoSearchTask(this);
+		
+		task.execute(queryTerm);
+		
+		List<VideoProperties> results = null;
+		try {
+			results = task.get();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (ExecutionException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		return results;
+	}
+	
 	private void playVideo() {
 		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
 		startActivity(i);
@@ -65,18 +103,6 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	}
 	
 	/**
-	 * Holds basic information for a video shown in the search list.
-	 * 
-	 * @author Brian Rupert
-	 *
-	 */
-	private class VideoSummaryInfo {
-		private int id;
-		private String title;
-		private String description;
-	}
-	
-	/**
 	 * This adapter controls the display of the video list.
 	 * 
 	 * @author Brian Rupert
@@ -84,18 +110,18 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	 */
 	private class VideoResultsListAdapter extends BaseAdapter implements ListAdapter {
 		
-		private List<VideoSummaryInfo> delegate = new ArrayList<VideoSummaryInfo>();
+		private List<VideoProperties> delegate = new ArrayList<VideoProperties>();
 		
 		VideoResultsListAdapter() {
 			
-			for (int i = 0; i < 10; i++) {
-				VideoSummaryInfo test = new VideoSummaryInfo();
-				test.id = 1;
-				test.title = "Test Video Title (" + i + ")";
-				test.description = "A video description is shown here";
-				
-				this.delegate.add(test);
+		}
+		
+		public void update(List<VideoProperties> newlist) {
+			this.delegate.clear();
+			if (newlist != null) {
+				this.delegate.addAll(newlist);
 			}
+			notifyDataSetChanged();
 		}
 
 		@Override
@@ -110,26 +136,31 @@ public class MainActivity extends Activity implements OnItemClickListener {
 
 		@Override
 		public long getItemId(int position) {
-			VideoSummaryInfo info = (VideoSummaryInfo) getItem(position);
+			VideoProperties info = (VideoProperties) getItem(position);
 			if (info != null) {
-				return info.id;
+				return info.hashCode();
 			}
 			return 0;
 		}
 
 		@Override
 		public View getView(int position, View convertView, ViewGroup parent) {
-			VideoSummaryInfo info = (VideoSummaryInfo) this.getItem(position);
+			final VideoProperties info = (VideoProperties) this.getItem(position);
 			
 			if (convertView == null) {
 				convertView = getLayoutInflater().inflate(R.layout.video_list_item, parent, false);
 			}
 			
-			TextView titleText = (TextView) convertView.findViewById(R.id.textView1);
-			titleText.setText(info.title);
+			TextView titleText = (TextView) convertView.findViewById(R.id.resultTitle);
+			titleText.setText(info.getTitle());
 			
-			TextView descText = (TextView) convertView.findViewById(R.id.textView2);
-			descText.setText(info.description);
+			TextView descText = (TextView) convertView.findViewById(R.id.resultDescription);
+			descText.setText(null);
+			
+			final ImageView img = (ImageView) convertView.findViewById(R.id.resultImage);
+			if (info.getThumbnail() != null) {
+				img.setImageBitmap(info.getThumbnail());
+			}
 			
 			return convertView;
 		}

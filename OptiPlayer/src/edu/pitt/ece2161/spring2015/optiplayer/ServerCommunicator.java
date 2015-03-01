@@ -146,7 +146,7 @@ public class ServerCommunicator {
         new getRemoteData_WebService(ctx, "UploadSchemedb",
         		new String[] {"TeamName","VideoName" ,"VideoURL","VideoLgh",
         						"OptStepLgh","OptDimLv","fileBase64Datas"},
-        		new String[] {TEAM_NAME, vidProps.getName(), vidProps.getUrl(),
+        		new String[] {TEAM_NAME, vidProps.getServerName(), vidProps.getUrl(),
         						vidProps.getLengthString(), vidProps.getOptStepLgh(),
         						vidProps.getOptDimLv(), fileBytes},
         		new UploadHandler(ctx));

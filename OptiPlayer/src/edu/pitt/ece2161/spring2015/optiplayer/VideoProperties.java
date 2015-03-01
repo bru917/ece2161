@@ -1,5 +1,7 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import android.graphics.Bitmap;
+
 /**
  * Holds properties of a video as well as optimization data.
  * 
@@ -10,9 +12,13 @@ public class VideoProperties {
 
 	private String id;
 	
-	private String name;
+	private String videoId;
+	
+	private String title;
 	
 	private String url;
+	
+	private Bitmap thumbnail;
 	
 	private Long length;
 	
@@ -21,16 +27,13 @@ public class VideoProperties {
 	
 	private String optDimLv;
 	
-	/**
-	 * Constructor.
-	 * @param id Video ID
-	 * @param name The name of the video.
-	 * @param url
-	 * @param length
-	 */
-	public VideoProperties(String id, String name, String url, Long length) {
+	public VideoProperties() {
+		
+	}
+
+	public VideoProperties(String id, String title, String url, Long length) {
 		this.id = id;
-		this.name = name;
+		this.title = title;
 		this.url = url;
 		this.length = length;
 	}
@@ -41,6 +44,10 @@ public class VideoProperties {
 		}
 		return null;
 	}
+	
+	public String getServerName() {
+		return this.title;
+	}
 
 	public String getId() {
 		return id;
@@ -50,12 +57,20 @@ public class VideoProperties {
 		this.id = id;
 	}
 
-	public String getName() {
-		return name;
+	public String getVideoId() {
+		return videoId;
 	}
 
-	public void setName(String name) {
-		this.name = name;
+	public void setVideoId(String videoId) {
+		this.videoId = videoId;
+	}
+
+	public String getTitle() {
+		return title;
+	}
+
+	public void setTitle(String title) {
+		this.title = title;
 	}
 
 	public String getUrl() {
@@ -76,6 +91,14 @@ public class VideoProperties {
 
 	public String getOptStepLgh() {
 		return optStepLgh;
+	}
+
+	public Bitmap getThumbnail() {
+		return thumbnail;
+	}
+
+	public void setThumbnail(Bitmap thumbnail) {
+		this.thumbnail = thumbnail;
 	}
 
 	public void setOptStepLgh(String optStepLgh) {
