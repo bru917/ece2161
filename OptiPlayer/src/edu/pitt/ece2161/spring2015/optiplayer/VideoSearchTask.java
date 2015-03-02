@@ -137,6 +137,9 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 			info.setVideoId(r.getId().getVideoId());
 			// Assign the video's title text.
 			info.setTitle(r.getSnippet().getTitle());
+			
+			info.setUrl("http://www.youtube.com/watch?v=" + r.getId().getVideoId());
+			
 			// Inspect thumbnail properties and download the image.
 			ThumbnailDetails d = r.getSnippet().getThumbnails();
 			if (d != null) {
