@@ -8,7 +8,9 @@ import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
+import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -20,6 +22,7 @@ import android.widget.ImageView;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.TextView.OnEditorActionListener;
 
 /**
  * The main user interface activity invoked on application start-up.
@@ -44,6 +47,15 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		ListView listView = (ListView) findViewById(R.id.searchList);
 		listView.setAdapter(listAdapter);
 		listView.setOnItemClickListener(this);
+		
+		TextView searchInput = (TextView) findViewById(R.id.searchText);
+		searchInput.setOnEditorActionListener(new OnEditorActionListener() {
+			@Override
+			public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
+				clickSearchButton(v);
+				return true;
+			}
+		});
 	}
 	
 	@Override
@@ -123,15 +135,14 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		task.execute(queryTerm);
 	}
 	
-	private void playVideo() {
-		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
-		startActivity(i);
-	}
 	
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 		// Invoked when a video in the search list is clicked.
-		playVideo();
+		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
+		VideoProperties vidProps = (VideoProperties) parent.getItemAtPosition(position);
+		i.putExtra("VideoID", vidProps.getVideoId());
+		startActivity(i);
 	}
 	
 	/**
@@ -178,6 +189,9 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			final ImageView img = (ImageView) convertView.findViewById(R.id.resultImage);
 			if (info.getThumbnail() != null) {
 				img.setImageBitmap(info.getThumbnail());
+			} else {
+				img.setImageBitmap(
+						BitmapFactory.decodeResource(getResources(), R.drawable.placeholder));
 			}
 			
 			return convertView;
