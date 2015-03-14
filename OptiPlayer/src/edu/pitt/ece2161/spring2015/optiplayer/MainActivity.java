@@ -1,15 +1,24 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import java.net.InetAddress;
+import java.net.NetworkInterface;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
+import org.apache.http.conn.util.InetAddressUtils;
+
+import com.google.api.client.googleapis.json.GoogleJsonResponseException;
+
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -95,15 +104,37 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		final VideoSearchTask task = new VideoSearchTask(this) {
 			
 			@Override
+			protected void onPreExecute() {
+				super.onPreExecute();
+			}
+			
+			@Override
 			protected void onPostExecute(List<VideoProperties> results) {
 				super.onPostExecute(results);
+				
 				progress.dismiss();
-				// Clear-out the old results.
-				searchResultList.clear();
-				// Add all the new results.
-				searchResultList.addAll(results);
-				// Tell the list view to update.
-				listAdapter.notifyDataSetChanged();
+				
+				if (this.getException() != null) {
+					Exception e = this.getException();
+					String msg = e.getMessage();
+					if (e instanceof GoogleJsonResponseException) {
+						GoogleJsonResponseException gx = (GoogleJsonResponseException) e;
+						msg = "Error " + gx.getDetails().getCode()
+								+ ": " + gx.getDetails().getMessage();
+					}
+					
+					new AlertDialog.Builder(MainActivity.this)
+		            	.setTitle("YouTube Service Error")
+		            	.setMessage(msg)
+		            	.show();
+				} else {
+					// Clear-out the old results.
+					searchResultList.clear();
+					// Add all the new results.
+					searchResultList.addAll(results);
+					// Tell the list view to update.
+					listAdapter.notifyDataSetChanged();
+				}
 			}
 			
 			@Override

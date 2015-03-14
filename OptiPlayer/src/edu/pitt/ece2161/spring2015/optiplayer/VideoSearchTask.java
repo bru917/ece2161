@@ -19,9 +19,9 @@ import com.google.api.services.youtube.model.SearchListResponse;
 import com.google.api.services.youtube.model.SearchResult;
 import com.google.api.services.youtube.model.ThumbnailDetails;
 
-import android.app.AlertDialog;
 import android.content.Context;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
 
 /**
@@ -35,7 +35,8 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 	/** Used for logging. */
 	private static final String TAG = "bjr";
 	
-	private static final String YT_API_KEY = "AIzaSyD_I87Aqzsqk3Logv16THvgWaDZhIvgx1Y";
+	private static final String YT_API_KEY_IP = "AIzaSyD_I87Aqzsqk3Logv16THvgWaDZhIvgx1Y";
+	private static final String YT_API_KEY_APPSIG = "AIzaSyDorMD0uUuD4FS7p8E75InUIDNovijgvOM";
 	
     /**
      * Define a global instance of the HTTP transport.
@@ -50,6 +51,8 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
     private int maxResults = 10;
     
     private Context ctx;
+    
+    private Exception exception;
     
     /**
      * Constructor.
@@ -79,7 +82,15 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 
             YouTube.Search.List search = youtube.search().list("id,snippet");
             
-            search.setKey(YT_API_KEY);
+            // Assign the API key (if we're in an emulator the key is IP-based)
+            if ("unknown".equalsIgnoreCase(Build.MANUFACTURER)) {
+            	search.setKey(YT_API_KEY_IP);
+            	Log.d(TAG, "Using IP-based API key.");
+            } else {
+            	search.setKey(YT_API_KEY_APPSIG);
+            	Log.d(TAG, "Using app signature-based API key.");
+            }
+
             search.setQ(searchTerms);
             search.setType("video");
             search.setFields("items(id/kind,id/videoId,snippet/title,snippet/thumbnails/default/url)");
@@ -96,16 +107,11 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
             
             return toProps(searchResultList);
         } catch (GoogleJsonResponseException e) {
-        	
+        	this.exception = e;
             Log.w(TAG, "YT error (" + e.getDetails().getCode() + ") "
                     + e.getDetails().getMessage());
-            
-            new AlertDialog.Builder(ctx)
-            	.setTitle("YouTube Service Error")
-            	.setMessage(e.getDetails().getCode() + ": " + e.getDetails().getMessage())
-            	.show();
-
         } catch (IOException e) {
+        	this.exception = e;
 			Log.e(TAG, "IO error - " + e);
 		}
         
@@ -175,5 +181,9 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 	 */
 	public int getProgressMax() {
 		return 2 + this.maxResults;
+	}
+	
+	public Exception getException() {
+		return this.exception;
 	}
 }
