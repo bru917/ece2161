@@ -61,6 +61,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	private String localVideoFile;
 	
 	private VideoProcessingTask processingTask;
+	private Timer processingTaskTimer;
 	
 	/**
 	 * Gets the surface to be drawn on by the MediaCodec.
@@ -160,11 +161,13 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 				// Set-up the player with our surface.
 				preparePlayer();
 				
+				surfaceView.setPlayer(player);
+				
 				// Set-up background processing.
 				if (processingTask == null) {
+					processingTaskTimer = new Timer();
 					processingTask = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
-					Timer t = new Timer();
-					t.schedule(processingTask, 500, VideoProcessingTask.PROCESSING_INTERVAL_MS);
+					processingTaskTimer.schedule(processingTask, 500, VideoProcessingTask.PROCESSING_INTERVAL_MS);
 				}
 			}
 
@@ -239,17 +242,20 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 
 				@Override
 				public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+					Log.i(TAG, "onPlayerStateChanged -> " + playbackState);
 					if (playbackState == ExoPlayer.STATE_ENDED) {
 						showControls();
 					}
 				}
 
 				@Override
-				public void onPlayerError(ExoPlaybackException arg0) {
+				public void onPlayerError(ExoPlaybackException err) {
+					Log.e(TAG, "onPlayerError -> " + err);
 				}
 
 				@Override
 				public void onPlayWhenReadyCommitted() {
+					Log.i(TAG, "onPlayWhenReadyCommitted()");
 				}
 			});
 

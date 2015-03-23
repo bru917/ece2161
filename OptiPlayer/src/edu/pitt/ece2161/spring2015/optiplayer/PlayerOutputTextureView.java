@@ -10,6 +10,7 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
+import android.os.Environment;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -26,8 +27,9 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	private static final String TAG = "PlayerOutputTextureView";
 	
 	private static final boolean DEBUG = true;
-	private static final boolean SAVE_IMG = false;
+	private static final boolean SAVE_IMG = true;
 	
+	// Elements used in the capture process.
 	private int mHeight;
 	private int mWidth;
 	private int vidX;
@@ -38,14 +40,17 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	// TextureView
 	private SurfaceTexture mSurfaceTexture;
 	private Surface mSurface;
-
+	
+	// Need access to the current player position.
+	private CustomPlayer player;
+	
 	/**
 	 * Constructor.
 	 * @param context
 	 */
 	public PlayerOutputTextureView(Context context) {
 		super(context);
-		init();
+		init(context);
 	}
 	
 	/**
@@ -55,16 +60,21 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	 */
 	public PlayerOutputTextureView(Context context, AttributeSet attrs) {
 		super(context, attrs);
-		init();
+		init(context);
 	}
 	
 	/**
 	 * Initialization common to various constructors.
 	 */
-	private void init() {
+	private void init(Context context) {
+		
 	}
 	
-
+	public void setPlayer(CustomPlayer player) {
+		// Kind of a messy way to grab the player position.
+		this.player = player;
+	}
+	
 	@Override
 	public void onSurfaceReady(SurfaceTexture surface, int width, int height) {
 		// The underlying surface texture of this TextureView should be ready.
@@ -91,17 +101,16 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 			this.allocateBuffer(mWidth, mHeight);
 		}
 	}
-
+	
 	@Override
-	public void saveFrame(String filename) throws IOException {
-		Bitmap img = captureGL();
-		if (img != null) {
-			Log.i(TAG, "Capture = " + img);
-			
+	public CaptureData grabFrame() {
+		CaptureData cap = captureGL();
+		if (cap != null) {
+			//Log.i(TAG, "Capture = " + cap.getBitmap());
 			if (SAVE_IMG) {
 				// Write the captured bitmap to a file.
-				final Bitmap fImg = Bitmap.createBitmap(img);
-				final String fFileName = filename;
+				final Bitmap fImg = Bitmap.createBitmap(cap.getBitmap());
+				final String fFileName = getFileName();
 				Thread t = new Thread() {
 					public void run() {
 						try {
@@ -114,12 +123,17 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 				};
 				t.start();
 			}
-			
-			// Blow-away the bitmap object we generated.
-			img.recycle();
 		}
+		return cap;
 	}
 	
+	private String getFileName() {
+		captureCount++;
+		return Environment.getExternalStorageDirectory().getPath() + "/video_" + captureCount + ".png";
+	}
+	
+	private int captureCount = 0;
+
 	/**
 	 * Captures the current screen's display, however this only captures what
 	 * is available in GLES space. No hardware-based surfaces can be captured
@@ -127,7 +141,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	 * 
 	 * @return The bitmap of the display.
 	 */
-	private Bitmap captureGL() {
+	private CaptureData captureGL() {
 		if (mPixelBuf == null) {
 			Log.w(TAG, "Byte buffer undefined");
 			return null;
@@ -138,6 +152,11 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		}
 		// Ensure the buffer is reset to the start.
 		mPixelBuf.rewind();
+		
+		// TODO: How accurate can we be?
+		// Do this as close to the pixel grab as possible.
+		long pos = player.getCurrentPosition();
+		
 		// Pull the displayed pixels from GLES.
 		// The video content is included only when it uses TextureView.
 		GLES20.glReadPixels(vidX, vidY, mWidth, mHeight, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, mPixelBuf);
@@ -153,7 +172,8 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 			Log.d(TAG, "Screen capture completed in " + time + "ms");
 		}
 		
-		return bmp;
+		CaptureData cap = new CaptureData(bmp, pos);
+		return cap;
 	}
 	
 	/**
