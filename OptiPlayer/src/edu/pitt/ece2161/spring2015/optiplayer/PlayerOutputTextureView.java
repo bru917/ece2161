@@ -30,7 +30,10 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	
 	private int mHeight;
 	private int mWidth;
+	private int vidX;
+	private int vidY;
 	private ByteBuffer mPixelBuf;
+	private Object mPixelBufLock = new Object();
 	
 	// TextureView
 	private SurfaceTexture mSurfaceTexture;
@@ -59,7 +62,6 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	 * Initialization common to various constructors.
 	 */
 	private void init() {
-		
 	}
 	
 
@@ -81,16 +83,20 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		
 		// Generate a buffer to facilitate the conversion of the screen pixels
 		// into a more usable bitmap instance.
-		mHeight = 1024;
-		mWidth = 768;
-		this.allocateBuffer(mWidth, mHeight);
+		synchronized (mPixelBufLock) {
+			mHeight = height;
+			mWidth = width;
+			vidX = 0;
+			vidY = 0;
+			this.allocateBuffer(mWidth, mHeight);
+		}
 	}
 
 	@Override
 	public void saveFrame(String filename) throws IOException {
 		Bitmap img = captureGL();
 		if (img != null) {
-			Log.i(TAG, "GOT BITMAP! = " + img);
+			Log.i(TAG, "Capture = " + img);
 			
 			if (SAVE_IMG) {
 				// Write the captured bitmap to a file.
@@ -130,12 +136,11 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		if (DEBUG) {
 			start = System.currentTimeMillis();
 		}
-		
 		// Ensure the buffer is reset to the start.
 		mPixelBuf.rewind();
 		// Pull the displayed pixels from GLES.
 		// The video content is included only when it uses TextureView.
-		GLES20.glReadPixels(0, 0, mWidth, mHeight, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, mPixelBuf);
+		GLES20.glReadPixels(vidX, vidY, mWidth, mHeight, GLES20.GL_RGBA, GLES20.GL_UNSIGNED_BYTE, mPixelBuf);
 		// Generate a bitmap to copy the pixels into.
 		Bitmap bmp = Bitmap.createBitmap(mWidth, mHeight, Bitmap.Config.ARGB_8888);
 		// Reset the buffer to the start again.
@@ -221,6 +226,18 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 			}
 		}
 		setMeasuredDimension(width, height);
+	}
+
+	@Override
+	public void onSurfaceSizeChanged(SurfaceTexture surface, int width, int height) {
+		
+		synchronized (mPixelBufLock) {
+			this.mWidth = width;
+			this.mHeight = height;
+			this.vidX = (int) this.getX();
+			this.vidY = (int) this.getY();
+			this.allocateBuffer(mWidth, mHeight);
+		}
 	}
 
 }

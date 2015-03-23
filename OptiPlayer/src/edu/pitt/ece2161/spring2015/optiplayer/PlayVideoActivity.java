@@ -9,10 +9,13 @@ import com.google.android.exoplayer.ExoPlayerLibraryInfo;
 import com.google.android.exoplayer.drm.MediaDrmCallback;
 
 import edu.pitt.ece2161.spring2015.optiplayer.ServerCommunicator.CommCallback;
+import edu.pitt.ece2161.spring2015.optiplayer.ServerCommunicator.CommStatus;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Context;
+import android.content.DialogInterface;
+import android.content.DialogInterface.OnDismissListener;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.SurfaceTexture;
@@ -108,11 +111,30 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 			// Set up a request to the dimming server.
 			ServerCommunicator comm = new ServerCommunicator();
 			CommCallback cb = new CommCallback() {
-				public void execute(ServerCommunicator.CommStatus statusCode, Object data) {
+				@Override
+				public void execute(CommStatus statusCode, Object data) {
+					
+					String msg = statusCode.toString();
+					if (statusCode == CommStatus.DownloadNotFound) {
+						msg = "A dimming file does not exist yet";
+					}
 	
-					new AlertDialog.Builder(PlayVideoActivity.this).setTitle("Dimming Information")
-							.setMessage(statusCode + "").setPositiveButton("OK", null).show();
-	
+					// Begin playback on dismissal of the dialog.
+					OnDismissListener odl = new OnDismissListener() {
+						@Override
+						public void onDismiss(DialogInterface dialog) {
+							player.setPlayWhenReady(true);
+						}
+					};
+					
+					new AlertDialog.Builder(PlayVideoActivity.this)
+							.setTitle("Dimming Information")
+							.setMessage(msg)
+							.setCancelable(false)
+							.setPositiveButton("Play", null)
+							.setOnDismissListener(odl)
+							.show();
+					
 					progress.dismiss();
 				}
 			};
@@ -148,8 +170,8 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 
 			@Override
 			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-				// TODO Auto-generated method stub
 				Log.i(TAG, "onSurfaceTextureSizeChanged -> " + surface + ", " + width + ", " + height);
+				surfaceView.onSurfaceSizeChanged(surface, width, height);
 			}
 
 			@Override
@@ -157,8 +179,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 				if (player != null) {
 					player.blockingClearSurface();
 				}
-				// TODO Auto-generated method stub
-				return false;
+				return true;
 			}
 
 			@Override
@@ -232,19 +253,10 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 				}
 			});
 
-			// player.addListener(this);
-			// player.setTextListener(this);
-			// player.setMetadataListener(this);
-
 			player.seekTo(playerPosition);
 			playerNeedsPrepare = true;
 			mediaController.setMediaPlayer(player.getPlayerControl());
 			mediaController.setEnabled(true);
-			// eventLogger = new EventLogger();
-			// eventLogger.startSession();
-			// player.addListener(eventLogger);
-			// player.setInfoListener(eventLogger);
-			// player.setInternalErrorListener(eventLogger);
 		}
 		if (playerNeedsPrepare) {
 			player.prepare();
@@ -252,7 +264,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 			// updateButtonVisibilities();
 		}
 		player.setSurface(getVideoSurface());
-		player.setPlayWhenReady(true);
+		//player.setPlayWhenReady(true);
 
 	}
 	/**

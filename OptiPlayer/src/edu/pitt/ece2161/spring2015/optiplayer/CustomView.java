@@ -14,4 +14,6 @@ public interface CustomView {
 	public void setVideoWidthHeightRatio(float widthHeightRatio);
 
 	public void onSurfaceReady(SurfaceTexture surface, int width, int height);
+
+	public void onSurfaceSizeChanged(SurfaceTexture surface, int width, int height);
 }
