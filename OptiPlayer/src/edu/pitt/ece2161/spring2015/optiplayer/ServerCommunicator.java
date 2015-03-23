@@ -22,6 +22,11 @@ public class ServerCommunicator {
 	
 	private static final String TEAM_NAME = "SES174";
 	
+	/**
+	 * Server response codes.
+	 * 
+	 * @author Brian Rupert
+	 */
 	public enum CommStatus {
 		UploadOk,
 		UploadFailed,
@@ -31,10 +36,29 @@ public class ServerCommunicator {
 		DownloadFileFailed
 	}
 	
+	/**
+	 * A callback interface invoked when the server response is received.
+	 * 
+	 * @author Brian Rupert
+	 */
 	public interface CommCallback {
+		
+		/**
+		 * Invoked for the client to handle the server response.
+		 * @param status The server response code.
+		 * @param data The response data, if any response data was acquired.
+		 */
 		public void execute(CommStatus status, Object data);
 	}
 
+	/**
+	 * Downloads dimming data from the server, if a dimming scheme exists for
+	 * the requested video URL.
+	 * @param ctx The current context.
+	 * @param videoUrl The URL of the video being played.
+	 * @param callback A callback invoked after the server response has been
+	 * attained. A Status code will indicate how the server responded.
+	 */
 	public void download(Context ctx, String videoUrl, CommCallback callback) {
 		
 		if (videoUrl == null) {
@@ -51,6 +75,13 @@ public class ServerCommunicator {
         download(ctx, videoProps.getUrl(), callback);
 	}
 	
+	/**
+	 * This handler is responsible for discovering if a dimming scheme is available
+	 * for download. The scheme download is a two-stage (i.e. two-handler) process
+	 * where a second handler is responsible for the actual file download.
+	 * 
+	 * @author Brian Rupert
+	 */
 	private static class DownloadHandler extends Handler {
 		
 		private Context mContext;
@@ -110,9 +141,10 @@ public class ServerCommunicator {
 	/**
 	 * Upload to the server.
 	 * 
-	 * @param ctx
-	 * @param filePath
-	 * @param props
+	 * @param ctx The current context.
+	 * @param filePath The path of the file to upload.
+	 * @param props The properties of the corresponding video for this file.
+	 * @param cb The callback invoked to forward the server response. 
 	 */
 	public void upload(Context ctx, String filePath, VideoProperties props, CommCallback cb) {
         FileInputStream fis = null;

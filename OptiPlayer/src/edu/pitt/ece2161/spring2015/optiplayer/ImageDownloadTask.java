@@ -17,6 +17,8 @@ import android.util.Log;
  */
 public class ImageDownloadTask extends AsyncTask<Map<VideoProperties, String>, Void, Void> {
 	
+	private static final String TAG = "ImageDownloadTask";
+	
 	private MainActivity ctx;
 	
 	ImageDownloadTask(MainActivity ctx) {
@@ -43,7 +45,7 @@ public class ImageDownloadTask extends AsyncTask<Map<VideoProperties, String>, V
 				this.publishProgress();
 				
 			} catch (IOException e) {
-				Log.e("bjr", "Image download failed - " + e);
+				Log.e(TAG, "Image download failed - " + e);
 			}
 		}
 		return null;

@@ -1,12 +1,7 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
-import java.net.InetAddress;
-import java.net.NetworkInterface;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-
-import org.apache.http.conn.util.InetAddressUtils;
 
 import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 
@@ -18,7 +13,7 @@ import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.util.Log;
+import android.os.Environment;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -97,6 +92,31 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	 * @param view A reference to the button.
 	 */
 	public void clickSearchButton(View view) {
+		executeVideoSearch();
+		//playYoutubeVideo(null);
+	}
+	
+	/**
+	 * Invokes the player using the specified YouTube video ID.
+	 * If the ID is null, a video player "test mode" uses a local file.
+	 * @param videoId The video ID.
+	 */
+	private void playYoutubeVideo(String videoId) {
+		// Invoked when a video in the search list is clicked.
+		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
+		i.putExtra(PlayVideoActivity.VIDEO_ID, videoId);
+		if (videoId == null) {
+			// Use a local file to test.
+			i.putExtra(PlayVideoActivity.LOCAL_VIDEO_PATH,
+					Environment.getExternalStorageDirectory().getPath() + "/test_video.mp4");
+		}
+		startActivity(i);
+	}
+	
+	/**
+	 * Performs the youtube search based on the user text input.
+	 */
+	private void executeVideoSearch() {
 		TextView txt = (TextView) findViewById(R.id.searchText);
 		String queryTerm = txt.getText().toString();
 		
@@ -169,11 +189,10 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	
 	@Override
 	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-		// Invoked when a video in the search list is clicked.
-		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
+		// Get the properties element from the clicked item in the list.
 		VideoProperties vidProps = (VideoProperties) parent.getItemAtPosition(position);
-		i.putExtra("VideoID", vidProps.getVideoId());
-		startActivity(i);
+		// Pass the video ID to the player and begin playing.
+		playYoutubeVideo(vidProps.getVideoId());
 	}
 	
 	/**
@@ -233,5 +252,4 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	public void updateListView() {
 		this.listAdapter.notifyDataSetChanged();
 	}
-
 }

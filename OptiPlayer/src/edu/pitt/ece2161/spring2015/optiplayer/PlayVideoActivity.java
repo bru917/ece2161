@@ -1,14 +1,35 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
-import com.google.android.exoplayer.VideoSurfaceView;
+import java.util.Timer;
+import java.util.UUID;
+
+import com.google.android.exoplayer.ExoPlaybackException;
+import com.google.android.exoplayer.ExoPlayer;
+import com.google.android.exoplayer.ExoPlayerLibraryInfo;
+import com.google.android.exoplayer.drm.MediaDrmCallback;
 
 import edu.pitt.ece2161.spring2015.optiplayer.ServerCommunicator.CommCallback;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.graphics.SurfaceTexture;
+import android.media.MediaDrm.KeyRequest;
+import android.media.MediaDrm.ProvisionRequest;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
+import android.view.Surface;
+import android.view.TextureView;
+import android.view.TextureView.SurfaceTextureListener;
+import android.view.View;
+import android.view.View.OnTouchListener;
 import android.widget.MediaController;
 
 /**
@@ -17,62 +38,205 @@ import android.widget.MediaController;
  * @author Brian Rupert
  *
  */
-public class PlayVideoActivity extends Activity {
+public class PlayVideoActivity extends Activity implements CustomPlayer.ActivityCallback {
+	
+	private static final String TAG = "PlayVideoActivity";
+	
+	public static final String VIDEO_ID = "VideoID";
+	public static final String LOCAL_VIDEO_PATH = "LocalVideoPath";
 
-	private ProgressDialog progress;
-
-	private VideoSurfaceView surfaceView;
+	//private VideoSurfaceView surfaceView;
+	private CustomView surfaceView;
 	private MediaController mediaController;
+
+	private CustomPlayer player;
+	private boolean playerNeedsPrepare;
+	private long playerPosition = 0;
+	private boolean enableBackgroundAudio;
+
+	private String videoId;
+	private String localVideoFile;
+	
+	private VideoProcessingTask processingTask;
+	
+	/**
+	 * Gets the surface to be drawn on by the MediaCodec.
+	 * @return
+	 */
+	private Surface getVideoSurface() {
+		return surfaceView.getSurface();
+	}
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_play_video);
 
-		progress = new ProgressDialog(this);
-		progress.setTitle("Please wait");
-		progress.setMessage("Loading video...");
-		progress.setIndeterminate(true);
-		progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-		progress.setProgress(0);
-		progress.show();
-
-		String videoId = this.getIntent().getExtras().getString("VideoID");
-		
-		ServerCommunicator comm = new ServerCommunicator();
-		CommCallback cb = new CommCallback() {
-			public void execute(ServerCommunicator.CommStatus statusCode, Object data) { 
+		final View root = findViewById(R.id.vRoot);
+		root.setOnTouchListener(new OnTouchListener() {
+			@Override
+			public boolean onTouch(View view, MotionEvent motionEvent) {
+				// TODO: We get a WindowLeaked error from here when we
+				// back-out to the main activity...
+				if (!root.isShown()) {
+					Log.i(TAG, "onTouch bailing");
+					return true;
+				}
 				
-                new AlertDialog.Builder(PlayVideoActivity.this)
-	            	.setTitle("Dimming Information")
-	            	.setMessage(statusCode + "")
-	                .setPositiveButton("OK", null)
-	                .show();
-				
-				progress.dismiss();
+				if (motionEvent.getAction() == MotionEvent.ACTION_DOWN) {
+					toggleControlsVisibility();
+				} else if (motionEvent.getAction() == MotionEvent.ACTION_UP) {
+					view.performClick();
+				}
+				return true;
 			}
-		};
-		comm.download(this, videoId, cb);
+		});
 
-		
-		//LoadVideoTask task = new LoadVideoTask();
-		//task.execute(videoId);
+		// Pull the video ID that should be streamed.
+		this.videoId = this.getIntent().getExtras().getString(VIDEO_ID);
+		this.localVideoFile = this.getIntent().getExtras().getString(LOCAL_VIDEO_PATH);
+		// Without a video ID, there is nothing to wait for or download.
+		if (this.videoId != null) {
+			// Set up a progress dialog to give the user instant feedback.
+			final ProgressDialog progress = new ProgressDialog(this);
+			progress.setTitle("Please wait");
+			progress.setMessage("Loading video...");
+			progress.setIndeterminate(true);
+			progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+			progress.setProgress(0);
+			progress.show();
+			// Set up a request to the dimming server.
+			ServerCommunicator comm = new ServerCommunicator();
+			CommCallback cb = new CommCallback() {
+				public void execute(ServerCommunicator.CommStatus statusCode, Object data) {
+	
+					new AlertDialog.Builder(PlayVideoActivity.this).setTitle("Dimming Information")
+							.setMessage(statusCode + "").setPositiveButton("OK", null).show();
+	
+					progress.dismiss();
+				}
+			};
+			// Request any existing dimming information.
+			comm.download(this, videoId, cb);
+		}
 
 		mediaController = new MediaController(this);
+		mediaController.setAnchorView(root);
+		
+		// Where the MediaCodec writes into
+		this.surfaceView = (CustomView) findViewById(R.id.vTextureView);
+		
+		TextureView tv = (TextureView) this.surfaceView;
+		tv.setSurfaceTextureListener(new SurfaceTextureListener() {
 
-		surfaceView = (VideoSurfaceView) findViewById(R.id.vSurfaceView);
+			@Override
+			public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+				Log.d(TAG, "onSurfaceTextureAvailable() running");
+				// Allow the view to set itself up.
+				surfaceView.onSurfaceReady(surface, width, height);
+				
+				// Set-up the player with our surface.
+				preparePlayer();
+				
+				// Set-up background processing.
+				if (processingTask == null) {
+					processingTask = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
+					Timer t = new Timer();
+					t.schedule(processingTask, 500, VideoProcessingTask.PROCESSING_INTERVAL_MS);
+				}
+			}
+
+			@Override
+			public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+				// TODO Auto-generated method stub
+				Log.i(TAG, "onSurfaceTextureSizeChanged -> " + surface + ", " + width + ", " + height);
+			}
+
+			@Override
+			public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+				if (player != null) {
+					player.blockingClearSurface();
+				}
+				// TODO Auto-generated method stub
+				return false;
+			}
+
+			@Override
+			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+				// TODO Auto-generated method stub
+				
+			}
+		});
+
 	}
 
-	private CustomPlayer player;
-	private boolean playerNeedsPrepare;
+	@Override
+	public void onPause() {
+		super.onPause();
+		if (!enableBackgroundAudio) {
+			releasePlayer();
+		} else {
+			player.setBackgrounded(true);
+		}
+		// shutterView.setVisibility(View.VISIBLE);
+		
+		processingTask.cancel();
+	}
 
+	@Override
+	public void onDestroy() {
+		super.onDestroy();
+		releasePlayer();
+		
+		processingTask.cancel();
+	}
+
+	/**
+	 * Begins preparing the video player resources.
+	 */
 	private void preparePlayer() {
+		
+		String url = VideoUrlProcessor.getDashUrl(this, videoId);
+		String id = videoId;
+
 		if (player == null) {
-			player = new CustomPlayer();
+			MediaDrmCallback drmCallback = new MyDrmCallback();
+
+			ExoRendererBuilder rb;
+			if (id == null) {
+				// Play local video file:
+				rb = new ExoDefaultRendererBuilder(this, Uri.parse(this.localVideoFile));
+				
+			} else {
+				// Play video using DASH streaming:
+				rb = new ExoDashRendererBuilder(getUserAgent(this), url, id, drmCallback, null);
+			}
+			
+			player = new CustomPlayer(rb, this);
+
+			player.getExo().addListener(new ExoPlayer.Listener() {
+
+				@Override
+				public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+					if (playbackState == ExoPlayer.STATE_ENDED) {
+						showControls();
+					}
+				}
+
+				@Override
+				public void onPlayerError(ExoPlaybackException arg0) {
+				}
+
+				@Override
+				public void onPlayWhenReadyCommitted() {
+				}
+			});
+
 			// player.addListener(this);
 			// player.setTextListener(this);
 			// player.setMetadataListener(this);
-			player.seekTo(0);
+
+			player.seekTo(playerPosition);
 			playerNeedsPrepare = true;
 			mediaController.setMediaPlayer(player.getPlayerControl());
 			mediaController.setEnabled(true);
@@ -85,11 +249,86 @@ public class PlayVideoActivity extends Activity {
 		if (playerNeedsPrepare) {
 			player.prepare();
 			playerNeedsPrepare = false;
-			//updateButtonVisibilities();
+			// updateButtonVisibilities();
 		}
-		player.setSurface(surfaceView.getHolder().getSurface());
+		player.setSurface(getVideoSurface());
 		player.setPlayWhenReady(true);
+
 	}
+	/**
+	 * Generates a user agent string to identify our app/platform.
+	 * @param context
+	 * @return
+	 */
+	public static String getUserAgent(Context context) {
+		String versionName;
+		try {
+			String packageName = context.getPackageName();
+			PackageInfo info = context.getPackageManager().getPackageInfo(packageName, 0);
+			versionName = info.versionName;
+		} catch (NameNotFoundException e) {
+			versionName = "?";
+		}
+		return "OptiPlayer/" + versionName + " (Linux;Android " + Build.VERSION.RELEASE + ") "
+				+ "ExoPlayerLib/" + ExoPlayerLibraryInfo.VERSION;
+	}
+
+	/**
+	 * Releases the player resources.
+	 */
+	private void releasePlayer() {
+		if (player != null) {
+			playerPosition = player.getCurrentPosition();
+			player.release();
+			player = null;
+			// eventLogger.endSession();
+			// eventLogger = null;
+		}
+	}
+
+	@Override
+	public void onVideoSizeChanged(int width, int height, float pixelWidthAspectRatio) {
+		// shutterView.setVisibility(View.GONE);
+		surfaceView.setVideoWidthHeightRatio(height == 0 ? 1 : (width * pixelWidthAspectRatio) / height);
+	}
+
+	private void toggleControlsVisibility() {
+		if (mediaController.isShowing()) {
+			mediaController.hide();
+			// debugRootView.setVisibility(View.GONE);
+		} else {
+			showControls();
+		}
+	}
+
+	private void showControls() {
+		mediaController.show(0);
+		// debugRootView.setVisibility(View.VISIBLE);
+	}
+
+	// SurfaceHolder.Callback implementation
+
+	/*
+	@Override
+	public void surfaceCreated(SurfaceHolder holder) {
+		if (player != null) {
+			player.setSurface(getVideoSurface());
+		}
+	}
+
+	@Override
+	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+		// Do nothing.
+		Log.i(TAG, "surfaceChanged -> " + holder + ", " + format + ", " + width + ", " + height);
+	}
+
+	@Override
+	public void surfaceDestroyed(SurfaceHolder holder) {
+		if (player != null) {
+			player.blockingClearSurface();
+		}
+	}
+	*/
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
@@ -110,42 +349,34 @@ public class PlayVideoActivity extends Activity {
 		return super.onOptionsItemSelected(item);
 	}
 
-//	/**
-//	 * This asynchronous task can fetch the dimming scheme and load the video
-//	 * file/stream.
-//	 * 
-//	 * @author Brian Rupert
-//	 *
-//	 */
-//	private class LoadVideoTask extends AsyncTask<String, Void, Void> {
-//
-//		@Override
-//		protected Void doInBackground(String... id) {
-//			// Perform video loading...
-//			
-//			String videoId = id[0];
-//			
-//			try {
-//				Thread.sleep(3000);
-//			} catch (InterruptedException e) { }
-//
-//			//ServerCommunicator comm = new ServerCommunicator();
-//			//comm.download(PlayVideoActivity.this, videoId);
-//
-//			return null;
-//		}
-//
-//		@Override
-//		protected void onProgressUpdate(Void... values) {
-//			// Update progress indicator.
-//			progress.incrementProgressBy(1);
-//		}
-//
-//		@Override
-//		protected void onPostExecute(Void result) {
-//			// Called when complete.
-//			progress.dismiss();
-//		}
-//	}
+	/**
+	 * TODO: drm handling.
+	 */
+	private class MyDrmCallback implements MediaDrmCallback {
 
+		@Override
+		public byte[] executeKeyRequest(UUID arg0, KeyRequest arg1) throws Exception {
+			// TODO Auto-generated method stub
+			return null;
+		}
+
+		@Override
+		public byte[] executeProvisionRequest(UUID arg0, ProvisionRequest arg1) throws Exception {
+			// TODO Auto-generated method stub
+			return null;
+		}
+	}
+
+	@Override
+	public void onPlayerError(Throwable t) {
+		String msg = t.toString();
+		if (msg.length() > 200) {
+			msg = msg.substring(200) + "...";
+		}
+		
+		new AlertDialog.Builder(this)
+	    	.setTitle(t.getClass().getSimpleName())
+	    	.setMessage(t.toString())
+	    	.show();
+	}
 }

@@ -1,13 +1,15 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/vRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#111"
     tools:context="edu.pitt.ece2161.spring2015.optiplayer.PlayVideoActivity" >
+    
+    <edu.pitt.ece2161.spring2015.optiplayer.PlayerOutputTextureView
+        android:id="@+id/vTextureView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_gravity="center" />
 
-
-   <com.google.android.exoplayer.VideoSurfaceView android:id="@+id/vSurfaceView"
-      android:layout_width="match_parent"
-      android:layout_height="match_parent"
-      android:layout_gravity="center"/>
-
-</RelativeLayout>
+</FrameLayout>
