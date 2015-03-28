@@ -58,9 +58,9 @@ public class FrameAnalyzer {
 					+ brightness + ", position=" + currentPositionMs + "ms");
 		}
 		
-		long setBrightnessStart = System.currentTimeMillis();
+		//long setBrightnessStart = System.currentTimeMillis();
 		Settings.System.putInt(cResolver, Settings.System.SCREEN_BRIGHTNESS, brightness);
-		Log.d(TAG, "Set brightness of screen (" + (System.currentTimeMillis() - setBrightnessStart) + "ms)");
+		//Log.d(TAG, "Set brightness of screen (" + (System.currentTimeMillis() - setBrightnessStart) + "ms)");
 		
 		if (fileHandler != null) {
 			fileHandler.append(level, currentPositionMs);

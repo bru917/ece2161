@@ -6,11 +6,18 @@
     android:background="#111"
     android:keepScreenOn="true"
     tools:context="edu.pitt.ece2161.spring2015.optiplayer.PlayVideoActivity" >
-    
+
     <edu.pitt.ece2161.spring2015.optiplayer.PlayerOutputTextureView
         android:id="@+id/vTextureView"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="center" />
+  
+    <TextView android:id="@+id/tDebugText"
+          android:visibility="invisible"
+          android:textColor="#eee"
+          android:layout_gravity="top"
+          android:layout_height="wrap_content"
+          android:layout_width="match_parent"/>
 
 </FrameLayout>

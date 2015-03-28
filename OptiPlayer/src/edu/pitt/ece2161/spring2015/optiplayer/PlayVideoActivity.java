@@ -24,6 +24,8 @@ import android.media.MediaDrm.ProvisionRequest;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
+import android.provider.Settings.SettingNotFoundException;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -34,6 +36,7 @@ import android.view.TextureView.SurfaceTextureListener;
 import android.view.View;
 import android.view.View.OnTouchListener;
 import android.widget.MediaController;
+import android.widget.TextView;
 
 /**
  * This activity is used to play the video content.
@@ -60,8 +63,12 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	private String videoId;
 	private String localVideoFile;
 	
+	private TextView debugText;
+	
 	private VideoProcessingTask processingTask;
 	private Timer processingTaskTimer;
+	
+	private Integer origBrightnessSetting;
 	
 	/**
 	 * Gets the surface to be drawn on by the MediaCodec.
@@ -75,6 +82,17 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_play_video);
+		
+		Log.i(TAG, "Activity is being CREATED");
+		
+		// Remember the original brightness setting, to restore it later.
+		try {
+			origBrightnessSetting = Settings.System.getInt(
+					getContentResolver(), Settings.System.SCREEN_BRIGHTNESS);
+			Log.d(TAG, "Saved original brightness level of " + this.origBrightnessSetting);
+		} catch (SettingNotFoundException e) {
+			origBrightnessSetting = null;
+		}
 
 		final View root = findViewById(R.id.vRoot);
 		root.setOnTouchListener(new OnTouchListener() {
@@ -95,6 +113,11 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 				return true;
 			}
 		});
+		
+		if (AppSettings.DEBUG) {
+			debugText = (TextView) this.findViewById(R.id.tDebugText);
+			debugText.setVisibility(View.VISIBLE);
+		}
 
 		// Pull the video ID that should be streamed.
 		this.videoId = this.getIntent().getExtras().getString(VIDEO_ID);
@@ -192,6 +215,12 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		});
 
 	}
+	
+	@Override
+	public void onResume() {
+		super.onResume();
+		Log.i(TAG, "Activity is being RESUMED");
+	}
 
 	@Override
 	public void onPause() {
@@ -211,6 +240,15 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	public void onDestroy() {
 		super.onDestroy();
 		Log.i(TAG, "Activity is being DESTROYED");
+		
+		if (this.origBrightnessSetting != null) {
+			Log.d(TAG, "Restoring brightness level to " + this.origBrightnessSetting);
+			boolean ok = Settings.System.putInt(getContentResolver(),
+					Settings.System.SCREEN_BRIGHTNESS, this.origBrightnessSetting);
+			if (!ok) {
+				Log.w(TAG, "Failed to restore brightness setting");
+			}
+		}
 		
 		releasePlayer();
 		
@@ -275,6 +313,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		player.setPlayWhenReady(false);
 
 	}
+	
 	/**
 	 * Generates a user agent string to identify our app/platform.
 	 * @param context
@@ -375,5 +414,15 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	    	.setTitle(t.getClass().getSimpleName())
 	    	.setMessage(t.toString())
 	    	.show();
+	}
+	
+	/**
+	 * Update debug text area if it is shown.
+	 * @param text The new text to display.
+	 */
+	public void updateDebugText(String text) {
+		if (this.debugText != null) {
+			this.debugText.setText(text);
+		}
 	}
 }
