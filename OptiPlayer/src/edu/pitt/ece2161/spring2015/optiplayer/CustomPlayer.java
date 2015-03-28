@@ -1,6 +1,7 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 import android.os.Handler;
 import android.util.Log;
@@ -291,6 +292,7 @@ public class CustomPlayer implements ExoPlayer.Listener {
 		pushTrackSelection(TYPE_AUDIO, true);
 		pushTrackSelection(TYPE_TEXT, true);
 		player.prepare(renderers);
+		Log.v(TAG, "Player renderers prepared: trackNames=" + Arrays.toString(this.trackNames));
 	}
 
 	private void pushTrackSelection(int type, boolean allowRendererEnable) {
@@ -437,6 +439,11 @@ public class CustomPlayer implements ExoPlayer.Listener {
 		
 	}
 
+	/**
+	 * Gets the current playback position in milliseconds.
+	 * @see ExoPlayer#getCurrentPosition()
+	 * @return current video position in milliseconds.
+	 */
 	public long getCurrentPosition() {
 		return player.getCurrentPosition();
 	}
