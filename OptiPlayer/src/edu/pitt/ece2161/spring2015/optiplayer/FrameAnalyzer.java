@@ -5,6 +5,7 @@ import java.util.Arrays;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
@@ -19,19 +20,30 @@ public class FrameAnalyzer {
 	public FrameAnalyzer(Context ctx) {
 		cResolver = ctx.getContentResolver();
 	}
+	
+	private int[] pix;
 
 	/**
 	 * Perform analysis and adjust backlight level.
 	 * @param img The image to analyze.
 	 * @param currentPositionMs The current position in the video (ms).
 	 */
-	public void analyze(Bitmap img, long currentPositionMs) {
+	public int analyze(Bitmap img, long currentPositionMs) {
 		long start = System.currentTimeMillis();
+		
+		if (AppSettings.DEBUG) {
+			if (Looper.myLooper() == Looper.getMainLooper()) {
+				Log.w(TAG, "Analysis running on main thread");
+			}
+		}
 		
 		int w = img.getWidth();
 		int h = img.getHeight();
 
-		int[] pix = new int[w * h];
+		int pixCount = w * h;
+		if (pix == null || pix.length != pixCount) {
+			pix = new int[pixCount];
+		}
 		img.getPixels(pix, 0, w, 0, 0, w, h);
 
 		int level = processArray(w, h, pix);
@@ -39,27 +51,41 @@ public class FrameAnalyzer {
 		// Changing the Backlight by the calculated level
 		// The Minimum Backlight is 10 and the Maximum Backlight is 255;
 		int brightness = getBrightness(level);
-
-		// Log.d("TAG", "brightness"+Integer.toString(brightness));
-		// brightness=average/255
-		Settings.System.putInt(cResolver, Settings.System.SCREEN_BRIGHTNESS, brightness);
 		
-		if (fileHandler != null) {
-			float pos = (float) currentPositionMs / 1000;
-			fileHandler.append(level, pos);
+		if (AppSettings.DEBUG) {
+			long time = System.currentTimeMillis() - start;
+			Log.d(TAG, "Analysis done! duration=" + time + "ms, level=" + level + ", brightness=" 
+					+ brightness + ", position=" + currentPositionMs + "ms");
 		}
 		
-		long time = System.currentTimeMillis() - start;
-		Log.d(TAG, "Analysis done! duration=" + time + "ms, level=" + level + ", position=" + currentPositionMs + "ms");
+		long setBrightnessStart = System.currentTimeMillis();
+		Settings.System.putInt(cResolver, Settings.System.SCREEN_BRIGHTNESS, brightness);
+		Log.d(TAG, "Set brightness of screen (" + (System.currentTimeMillis() - setBrightnessStart) + "ms)");
+		
+		if (fileHandler != null) {
+			fileHandler.append(level, currentPositionMs);
+		}
+		
+		return level;
 	}
 
 	// *************************************************Dimming Algorithm*****************************************************
-
-	public int processArray(int w, int l, int[] array) {
+	private static final double COEFF_R = 0.299;
+	private static final double COEFF_G = 0.5787;
+	private static final double COEFF_B = 0.114;
+	
+	/**
+	 * Processes the array of ARGB values to calculate the level.
+	 * @param w Frame width.
+	 * @param l Frame height.
+	 * @param array The ARGB data.
+	 * @return The calculated level.
+	 */
+	private int processArray(int w, int l, int[] array) {
 		int level = 0;
+		int totalPixels = l * w;
 
-		int[][] gray = new int[l][w];
-		int[] gray_one = new int[l * w];
+		int[] gray_one = new int[totalPixels];
 
 		int average = 0;
 
@@ -67,19 +93,19 @@ public class FrameAnalyzer {
 			for (int j = 0; j < w; j++) {
 				int loc = i * w + j;
 				int px = array[loc];
-				gray[i][j] = (int)
-						 ((0.299 * ((px >> 16) & 0xff))
-						+ (0.5787 * ((px >> 8) & 0xff))
-						+ (0.114 * (px & 0xff)));
-				gray_one[loc] = gray[i][j];
-				average = average + gray[i][j];
+				int gray = (int)
+						 ((COEFF_R * ((px >> 16) & 0xff))
+						+ (COEFF_G * ((px >> 8) & 0xff))
+						+ (COEFF_B * (px & 0xff)));
+				gray_one[loc] = gray;
+				average = average + gray;
 			}
 		}
 		Arrays.sort(gray_one);
 
-		int median = (gray_one[(l * w) / 2] + gray_one[((l * w) / 2) - 1]) / 2;
+		int median = (gray_one[totalPixels / 2] + gray_one[(totalPixels / 2) - 1]) / 2;
 
-		average = (int) (average / (l * w));
+		average = (int) (average / totalPixels);
 
 		if (Math.abs(median - average) < 60) {
 			level = (int) Math.floor(average / 32);

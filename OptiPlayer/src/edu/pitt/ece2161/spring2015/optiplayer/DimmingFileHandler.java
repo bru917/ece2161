@@ -33,8 +33,9 @@ public class DimmingFileHandler {
 		}
 	}
 	
-	public void append(int level, float pos) {
-		writefile("\n TEST                 " + level + "                 " + pos + "(sec)");
+	public void append(int level, long posMillis) {
+		float posSeconds = posMillis / 1000;
+		writefile("\n TEST                 " + level + "                 " + posSeconds + "(sec)");
 	}
 
 	// ******************************************************Read Dimming

@@ -1,5 +1,6 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -10,7 +11,6 @@ import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
 import android.opengl.GLES20;
-import android.os.Environment;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.Surface;
@@ -26,8 +26,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	
 	private static final String TAG = "PlayerOutputTextureView";
 	
-	private static final boolean DEBUG = true;
-	private static final boolean SAVE_IMG = true;
+	private static final boolean SAVE_IMG = false;
 	
 	// Elements used in the capture process.
 	private int mHeight;
@@ -108,7 +107,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		if (cap != null) {
 			//Log.i(TAG, "Capture = " + cap.getBitmap());
 			if (SAVE_IMG) {
-				// Write the captured bitmap to a file.
+				// Write the captured bitmap to a file for debugging purposes.
 				final Bitmap fImg = Bitmap.createBitmap(cap.getBitmap());
 				final String fFileName = getFileName();
 				Thread t = new Thread() {
@@ -129,7 +128,11 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 	
 	private String getFileName() {
 		captureCount++;
-		return Environment.getExternalStorageDirectory().getPath() + "/video_" + captureCount + ".png";
+		File dir = new File(AppSettings.getInstance().getStorageFolder());
+		if (!dir.exists()) {
+			dir.mkdirs();
+		}
+		return dir +  "/video_" + captureCount + ".png";
 	}
 	
 	private int captureCount = 0;
@@ -147,7 +150,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 			return null;
 		}
 		long start = 0;
-		if (DEBUG) {
+		if (AppSettings.DEBUG) {
 			start = System.currentTimeMillis();
 		}
 		// Ensure the buffer is reset to the start.
@@ -167,7 +170,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		// Copy the pixels into the bitmap.
 		bmp.copyPixelsFromBuffer(mPixelBuf);
 		
-		if (DEBUG) {
+		if (AppSettings.DEBUG) {
 			long time = System.currentTimeMillis() - start;
 			Log.d(TAG, "Screen capture completed in " + time + "ms");
 		}
