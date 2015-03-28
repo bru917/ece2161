@@ -65,12 +65,30 @@ final class VideoUrlProcessor {
 		        
 		        int dashStart = responseString.indexOf("\"" + DASH_KEY + "\"");
 		        if (dashStart > 0) {
+		        	
+		        	// Used for debugging the DASH URL parsing.
+		        	/*
+		        	String dashDataStart = responseString.substring(dashStart);
+		        	if (dashDataStart.length() > 3000) {
+		        		dashDataStart = dashDataStart.substring(0, 3000);
+		        	}
+		        	*/
+		        	
+		        	// The DASH URL is contained in a javascript/json formatted
+		        	// string, so either of these sequences may delimit the end
+		        	// of the URL we're trying to extract:
 		        	int dashEnd = responseString.indexOf("\",", dashStart);
+		        	int dashEnd2 = responseString.indexOf("\"},", dashStart);
+		        	
+		        	if (dashEnd2 > 0 && dashEnd2 < dashEnd) {
+		        		dashEnd = dashEnd2;
+		        	}
 		        	
 		        	String dashUrl = responseString.substring(dashStart, dashEnd);
-		        	
+		        	// Strip off the DASH property key.
 		        	int urlBegin = dashUrl.indexOf("http:");
 		        	dashUrl = dashUrl.substring(urlBegin);
+		        	// Replace the raw escape sequences for backslashes.
 		        	dashUrl = dashUrl.replace("\\/", "/");
 		        	
 		        	responseString = dashUrl;
@@ -94,7 +112,7 @@ final class VideoUrlProcessor {
 			Uri dashUri = Uri.parse(dashUrl);
 			return dashUri.toString();
 		} catch (Exception e) {
-			Log.e(TAG, "URI parser error: " + e);
+			Log.e(TAG, "URI parser error: " + e + " for URL '" + dashUrl + "'");
 		}
 		
 		return null;
