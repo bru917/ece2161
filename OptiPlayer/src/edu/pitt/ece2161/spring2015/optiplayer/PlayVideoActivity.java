@@ -187,8 +187,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 
 			@Override
 			public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-				// TODO Auto-generated method stub
-				
+				//Log.v(TAG, "onSurfaceTextureUpdated -> " + surface);
 			}
 		});
 
@@ -203,6 +202,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 			player.setBackgrounded(true);
 		}
 		// shutterView.setVisibility(View.VISIBLE);
+		Log.i(TAG, "Activity is being PAUSED");
 		
 		processingTask.cancel();
 	}
@@ -210,6 +210,8 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	@Override
 	public void onDestroy() {
 		super.onDestroy();
+		Log.i(TAG, "Activity is being DESTROYED");
+		
 		releasePlayer();
 		
 		processingTask.cancel();
@@ -270,7 +272,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 			// updateButtonVisibilities();
 		}
 		player.setSurface(getVideoSurface());
-		//player.setPlayWhenReady(true);
+		player.setPlayWhenReady(false);
 
 	}
 	/**
@@ -301,6 +303,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 			player = null;
 			// eventLogger.endSession();
 			// eventLogger = null;
+			Log.i(TAG, "Player resources released");
 		}
 	}
 
@@ -323,30 +326,6 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		mediaController.show(0);
 		// debugRootView.setVisibility(View.VISIBLE);
 	}
-
-	// SurfaceHolder.Callback implementation
-
-	/*
-	@Override
-	public void surfaceCreated(SurfaceHolder holder) {
-		if (player != null) {
-			player.setSurface(getVideoSurface());
-		}
-	}
-
-	@Override
-	public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-		// Do nothing.
-		Log.i(TAG, "surfaceChanged -> " + holder + ", " + format + ", " + width + ", " + height);
-	}
-
-	@Override
-	public void surfaceDestroyed(SurfaceHolder holder) {
-		if (player != null) {
-			player.blockingClearSurface();
-		}
-	}
-	*/
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
