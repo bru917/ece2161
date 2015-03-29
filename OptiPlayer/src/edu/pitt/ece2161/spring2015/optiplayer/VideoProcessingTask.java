@@ -27,6 +27,8 @@ class VideoProcessingTask extends TimerTask {
 	
 	private FrameAnalyzer analyzer;
 	
+	private boolean doAnalysis;
+	
 	/**
 	 * Create the background processing task.
 	 * @param surfaceView The view where the video is being rendered.
@@ -39,6 +41,11 @@ class VideoProcessingTask extends TimerTask {
 
 	@Override
 	public void run() {
+		if (!doAnalysis) {
+			Log.d(TAG, "Paused mode - skipping analysis");
+			return;
+		}
+		
 		if (this.context == null) {
 			Log.w(TAG, "The context is not set! bailing...");
 			return;
@@ -70,9 +77,14 @@ class VideoProcessingTask extends TimerTask {
 		boolean b = super.cancel();
 		if (backgroundHandler != null) {
 			backgroundHandler.cancel();
+			backgroundHandler.getLooper().quit();
 			backgroundHandler = null;
 		}
 		return b;
+	}
+	
+	public VideoAnalysisDataset getDataset() {
+		return this.analyzer.getDataset();
 	}
 
 	/**
@@ -174,5 +186,13 @@ class VideoProcessingTask extends TimerTask {
 			}
 		}
 		return threadName;
+	}
+	
+	public void setRunning() {
+		doAnalysis = true;
+	}
+
+	public void setPaused() {
+		doAnalysis = false;
 	}
 }

@@ -1,5 +1,6 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import java.io.FileNotFoundException;
 import java.util.Timer;
 import java.util.UUID;
 
@@ -44,7 +45,8 @@ import android.widget.TextView;
  * @author Brian Rupert
  *
  */
-public class PlayVideoActivity extends Activity implements CustomPlayer.ActivityCallback {
+public class PlayVideoActivity extends Activity
+implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 	
 	private static final String TAG = "PlayVideoActivity";
 	
@@ -124,46 +126,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		this.localVideoFile = this.getIntent().getExtras().getString(LOCAL_VIDEO_PATH);
 		// Without a video ID, there is nothing to wait for or download.
 		if (this.videoId != null) {
-			// Set up a progress dialog to give the user instant feedback.
-			final ProgressDialog progress = new ProgressDialog(this);
-			progress.setTitle("Please wait");
-			progress.setMessage("Loading video...");
-			progress.setIndeterminate(true);
-			progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-			progress.setProgress(0);
-			progress.show();
-			// Set up a request to the dimming server.
-			ServerCommunicator comm = new ServerCommunicator();
-			CommCallback cb = new CommCallback() {
-				@Override
-				public void execute(CommStatus statusCode, Object data) {
-					
-					String msg = statusCode.toString();
-					if (statusCode == CommStatus.DownloadNotFound) {
-						msg = "A dimming file does not exist yet";
-					}
-	
-					// Begin playback on dismissal of the dialog.
-					OnDismissListener odl = new OnDismissListener() {
-						@Override
-						public void onDismiss(DialogInterface dialog) {
-							player.setPlayWhenReady(true);
-						}
-					};
-					
-					new AlertDialog.Builder(PlayVideoActivity.this)
-							.setTitle("Dimming Information")
-							.setMessage(msg)
-							.setCancelable(false)
-							.setPositiveButton("Play", null)
-							.setOnDismissListener(odl)
-							.show();
-					
-					progress.dismiss();
-				}
-			};
-			// Request any existing dimming information.
-			comm.download(this, videoId, cb);
+			requestDimmingFile(videoId);
 		}
 
 		mediaController = new MediaController(this);
@@ -185,13 +148,6 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 				preparePlayer();
 				
 				surfaceView.setPlayer(player);
-				
-				// Set-up background processing.
-				if (processingTask == null) {
-					processingTaskTimer = new Timer();
-					processingTask = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
-					processingTaskTimer.schedule(processingTask, 500, VideoProcessingTask.PROCESSING_INTERVAL_MS);
-				}
 			}
 
 			@Override
@@ -217,6 +173,12 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	}
 	
 	@Override
+	public void onStart() {
+		super.onStart();
+		Log.i(TAG, "Activity is being STARTED");
+	}
+	
+	@Override
 	public void onResume() {
 		super.onResume();
 		Log.i(TAG, "Activity is being RESUMED");
@@ -225,15 +187,21 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 	@Override
 	public void onPause() {
 		super.onPause();
+		Log.i(TAG, "Activity is being PAUSED");
+		
 		if (!enableBackgroundAudio) {
 			releasePlayer();
 		} else {
 			player.setBackgrounded(true);
 		}
-		// shutterView.setVisibility(View.VISIBLE);
-		Log.i(TAG, "Activity is being PAUSED");
 		
-		processingTask.cancel();
+		setAnalysisMode(AnalysisMode.PAUSE);
+	}
+	
+	@Override
+	public void onStop() {
+		super.onStop();
+		Log.i(TAG, "Activity is being STOPPED");
 	}
 
 	@Override
@@ -252,7 +220,75 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		
 		releasePlayer();
 		
-		processingTask.cancel();
+		setAnalysisMode(AnalysisMode.STOP);
+	}
+	
+	/**
+	 * Displays a progress dialog and begins the process of contacting the
+	 * dimming file server. When the dimming file server responds, a callback
+	 * takes action.
+	 * 
+	 * If the dimming file was not found, a dialog is displayed
+	 * and the user can hit the 'Play' button to continue playing which will
+	 * also begin the video analysis.
+	 * 
+	 * If the dimming file was found, the file data is read and the background
+	 * dimming service is configured automatically, then the video begins as
+	 * soon as it is ready.
+	 * 
+	 * @param videoId The ID of the video we are requesting.
+	 */
+	private void requestDimmingFile(String videoId) {
+		// Set up a progress dialog to give the user instant feedback.
+		final ProgressDialog progress = new ProgressDialog(this);
+		progress.setTitle("Please wait");
+		progress.setMessage("Loading video...");
+		progress.setIndeterminate(true);
+		progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+		progress.setProgress(0);
+		progress.show();
+		// Set up a request to the dimming server.
+		ServerCommunicator comm = new ServerCommunicator();
+		CommCallback cb = new CommCallback() {
+			@Override
+			public void execute(CommStatus statusCode, Object data) {
+				
+				String msg = statusCode.toString();
+				if (statusCode == CommStatus.DownloadNotFound) {
+					msg = "A dimming file does not exist yet";
+				} else if (statusCode == CommStatus.DownloadOk) {
+					// Show nothing, just start playing.
+					msg = null;
+				}
+				
+				if (msg != null) {
+					// Begin playback on dismissal of the dialog.
+					OnDismissListener odl = new OnDismissListener() {
+						@Override
+						public void onDismiss(DialogInterface dialog) {
+							player.setPlayWhenReady(true);
+						}
+					};
+					
+					new AlertDialog.Builder(PlayVideoActivity.this)
+							.setTitle("Dimming Information")
+							.setMessage(msg)
+							.setCancelable(false)
+							.setPositiveButton("Play", null)
+							.setOnDismissListener(odl)
+							.show();
+				} else {
+					// TODO assign downloaded file into the playback
+					// background service.
+					
+					player.setPlayWhenReady(true);
+				}
+				
+				progress.dismiss();
+			}
+		};
+		// Request any existing dimming information.
+		comm.download(this, videoId, cb);
 	}
 
 	/**
@@ -277,28 +313,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 			}
 			
 			player = new CustomPlayer(rb, this);
-
-			player.getExo().addListener(new ExoPlayer.Listener() {
-
-				@Override
-				public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
-					Log.i(TAG, "onPlayerStateChanged -> " + playbackState);
-					if (playbackState == ExoPlayer.STATE_ENDED) {
-						showControls();
-					}
-				}
-
-				@Override
-				public void onPlayerError(ExoPlaybackException err) {
-					Log.e(TAG, "onPlayerError -> " + err);
-				}
-
-				@Override
-				public void onPlayWhenReadyCommitted() {
-					Log.i(TAG, "onPlayWhenReadyCommitted()");
-				}
-			});
-
+			player.getExo().addListener(this);
 			player.seekTo(playerPosition);
 			playerNeedsPrepare = true;
 			mediaController.setMediaPlayer(player.getPlayerControl());
@@ -311,7 +326,41 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		}
 		player.setSurface(getVideoSurface());
 		player.setPlayWhenReady(false);
-
+	}
+	
+	public enum AnalysisMode {
+		RUN,
+		PAUSE,
+		STOP;
+	}
+	
+	private void setAnalysisMode(AnalysisMode mode) {
+		switch(mode) {
+		case RUN:
+			// Set-up background processing.
+			if (processingTask == null) {
+				processingTaskTimer = new Timer();
+				processingTask = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
+				processingTaskTimer.schedule(processingTask, 500, VideoProcessingTask.PROCESSING_INTERVAL_MS);
+			}
+			processingTask.setRunning();
+			break;
+		case PAUSE:
+			if (processingTask != null) {
+				// TODO pause so we dont run analysis while paused.
+				processingTask.setPaused();
+			}
+			break;
+		case STOP:
+			if (processingTask != null) {
+				processingTask.cancel();
+				processingTaskTimer.cancel();
+				
+				processingTask = null;
+				processingTaskTimer = null;
+			}
+			break;
+		}
 	}
 	
 	/**
@@ -405,6 +454,16 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 
 	@Override
 	public void onPlayerError(Throwable t) {
+		
+		if (t instanceof FileNotFoundException) {
+			new AlertDialog.Builder(this)
+		    	.setTitle("Input Error")
+		    	.setMessage("The video cannot be played.\n\n"
+		    			+ "DASH streaming may not be supported for this video.")
+		    	.show();
+			return;
+		}
+		
 		String msg = t.toString();
 		if (msg.length() > 200) {
 			msg = msg.substring(200) + "...";
@@ -412,7 +471,7 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		
 		new AlertDialog.Builder(this)
 	    	.setTitle(t.getClass().getSimpleName())
-	    	.setMessage(t.toString())
+	    	.setMessage(msg)
 	    	.show();
 	}
 	
@@ -424,5 +483,47 @@ public class PlayVideoActivity extends Activity implements CustomPlayer.Activity
 		if (this.debugText != null) {
 			this.debugText.setText(text);
 		}
+	}
+	
+	// ExoPlayer.Listener
+	
+	@Override
+	public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+		Log.i(TAG, "onPlayerStateChanged -> " + playbackState);
+		switch (playbackState) {
+		case ExoPlayer.STATE_IDLE:
+			break;
+		case ExoPlayer.STATE_PREPARING:
+			break;
+		case ExoPlayer.STATE_BUFFERING:
+			// Probably waiting for data to come in on the stream.
+			setAnalysisMode(AnalysisMode.PAUSE);
+			break;
+		case ExoPlayer.STATE_READY:
+			if (playWhenReady) {
+				// Starting to play.
+				setAnalysisMode(AnalysisMode.RUN);
+			} else {
+				// Paused.
+				setAnalysisMode(AnalysisMode.PAUSE);
+			}
+			break;
+		case ExoPlayer.STATE_ENDED:
+			setAnalysisMode(AnalysisMode.PAUSE);
+			showControls();
+			break;
+		default:
+			break;
+		}
+	}
+
+	@Override
+	public void onPlayerError(ExoPlaybackException err) {
+		Log.e(TAG, "onPlayerError -> " + err);
+	}
+
+	@Override
+	public void onPlayWhenReadyCommitted() {
+		Log.i(TAG, "onPlayWhenReadyCommitted()");
 	}
 }

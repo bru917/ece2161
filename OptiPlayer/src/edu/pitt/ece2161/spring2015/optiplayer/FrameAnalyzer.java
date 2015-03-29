@@ -15,14 +15,16 @@ public class FrameAnalyzer {
 
 	private ContentResolver cResolver;
 	
-	private DimmingFileHandler fileHandler;
-
-	public FrameAnalyzer(Context ctx) {
-		cResolver = ctx.getContentResolver();
-	}
+	private VideoAnalysisDataset dataset;
 	
+	/** This array is used to copy the pixels from a bitmap into for analysis. */
 	private int[] pix;
 
+	public FrameAnalyzer(Context ctx) {
+		this.cResolver = ctx.getContentResolver();
+		this.dataset = new VideoAnalysisDataset();
+	}
+	
 	/**
 	 * Perform analysis and adjust backlight level.
 	 * @param img The image to analyze.
@@ -33,6 +35,8 @@ public class FrameAnalyzer {
 		
 		if (AppSettings.DEBUG) {
 			if (Looper.myLooper() == Looper.getMainLooper()) {
+				// Note that we should AVOID running this on the main thread
+				// because it will cause some serious lag on the video.
 				Log.w(TAG, "Analysis running on main thread");
 			}
 		}
@@ -44,26 +48,30 @@ public class FrameAnalyzer {
 		if (pix == null || pix.length != pixCount) {
 			pix = new int[pixCount];
 		}
+		// Copy pixels into this flat array for analysis.
 		img.getPixels(pix, 0, w, 0, 0, w, h);
-
+		// Process the pixels to compute the screen brightness level.
 		int level = processArray(w, h, pix);
-
+		
 		// Changing the Backlight by the calculated level
 		// The Minimum Backlight is 10 and the Maximum Backlight is 255;
 		int brightness = getBrightness(level);
 		
 		if (AppSettings.DEBUG) {
 			long time = System.currentTimeMillis() - start;
-			Log.d(TAG, "Analysis done! duration=" + time + "ms, level=" + level + ", brightness=" 
-					+ brightness + ", position=" + currentPositionMs + "ms");
+			Log.d(TAG, "Analysis done! "
+					+ "duration=" + time + "ms, "
+					+ "level=" + level + ", "
+					+ "brightness=" + brightness + ", "
+					+ "position=" + currentPositionMs + "ms");
 		}
 		
 		//long setBrightnessStart = System.currentTimeMillis();
 		Settings.System.putInt(cResolver, Settings.System.SCREEN_BRIGHTNESS, brightness);
 		//Log.d(TAG, "Set brightness of screen (" + (System.currentTimeMillis() - setBrightnessStart) + "ms)");
 		
-		if (fileHandler != null) {
-			fileHandler.append(level, currentPositionMs);
+		if (dataset != null) {
+			dataset.update(currentPositionMs, level);
 		}
 		
 		return level;
@@ -147,5 +155,9 @@ public class FrameAnalyzer {
 			break;
 		}
 		return brightness;
+	}
+	
+	public VideoAnalysisDataset getDataset() {
+		return this.dataset;
 	}
 }
