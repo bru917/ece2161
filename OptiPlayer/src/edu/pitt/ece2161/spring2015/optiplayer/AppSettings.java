@@ -1,5 +1,7 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import java.io.File;
+
 import android.os.Environment;
 
 /**
@@ -32,5 +34,10 @@ public final class AppSettings {
 
 	public String getStorageFolder() {
 		return storageFolder;
+	}
+
+	public File getLocalAnalysisFile(String videoId) {
+		File f = new File(this.storageFolder + "/opt_" + videoId + ".txt");
+		return f;
 	}
 }

@@ -22,4 +22,10 @@ public interface CustomView {
 	public void onSurfaceSizeChanged(SurfaceTexture surface, int width, int height);
 
 	public void setPlayer(CustomPlayer player);
+
+	/**
+	 * Write some debug text that may be shown in the view.
+	 * @param string The value to show in the view.
+	 */
+	public void setDebugText(String string);
 }

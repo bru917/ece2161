@@ -60,6 +60,11 @@ public class MainActivity extends Activity implements OnItemClickListener {
 				return true;
 			}
 		});
+		
+		if (AppSettings.DEBUG) {
+			// Insert text for quick debugging
+			searchInput.setText("clarkson bmw estate");
+		}
 	}
 	
 	@Override
@@ -101,14 +106,17 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	 * If the ID is null, a video player "test mode" uses a local file.
 	 * @param videoId The video ID.
 	 */
-	private void playYoutubeVideo(String videoId) {
+	private void playYoutubeVideo(VideoProperties props) {
 		// Invoked when a video in the search list is clicked.
 		Intent i = new Intent(MainActivity.this, PlayVideoActivity.class);
-		i.putExtra(PlayVideoActivity.VIDEO_ID, videoId);
-		if (videoId == null) {
+		if (props == null) {
 			// Use a local file to test.
 			i.putExtra(PlayVideoActivity.LOCAL_VIDEO_PATH,
 					Environment.getExternalStorageDirectory().getPath() + "/test_video.mp4");
+		} else {
+			i.putExtra(PlayVideoActivity.VIDEO_ID, props.getVideoId());
+			i.putExtra(PlayVideoActivity.VIDEO_TITLE, props.getTitle());
+			i.putExtra(PlayVideoActivity.VIDEO_URL, props.getUrl());
 		}
 		startActivity(i);
 	}
@@ -192,7 +200,7 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		// Get the properties element from the clicked item in the list.
 		VideoProperties vidProps = (VideoProperties) parent.getItemAtPosition(position);
 		// Pass the video ID to the player and begin playing.
-		playYoutubeVideo(vidProps.getVideoId());
+		playYoutubeVideo(vidProps);
 	}
 	
 	/**

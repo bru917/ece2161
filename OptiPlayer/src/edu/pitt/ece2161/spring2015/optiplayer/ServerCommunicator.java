@@ -11,6 +11,7 @@ import edu.pitt.ece2161.spring2015.server.getRemoteData_WebService;
 import android.content.Context;
 import android.os.Handler;
 import android.os.Message;
+import android.util.Log;
 
 /**
  * This class handles the file upload and download requests to the server.
@@ -20,6 +21,8 @@ import android.os.Message;
  */
 public class ServerCommunicator {
 	
+	private static final String TAG = "ServerComm";
+	
 	private static final String TEAM_NAME = "SES174";
 	
 	/**
@@ -28,11 +31,22 @@ public class ServerCommunicator {
 	 * @author Brian Rupert
 	 */
 	public enum CommStatus {
+		/** Upload successful. Data is the server return code, should be "true". */
 		UploadOk,
+		
+		/** An error occurred while uploading. Data is the {@link Message} received by the handler. */
 		UploadFailed,
+		
+		/** Download was successful. Data is the file content as a string. */
 		DownloadOk,
+		
+		/** Download successfully detected that a file does not exist yet. Data is {@code null}. */
 		DownloadNotFound,
+		
+		/** An error occurred while requesting the download. Data is the {@link Message} received by the handler. */
 		DownloadRequestFailed,
+		
+		/** An error occurred while downloading the file. Data is the {@link Message} received by the handler. */
 		DownloadFileFailed
 	}
 	
@@ -45,6 +59,7 @@ public class ServerCommunicator {
 		
 		/**
 		 * Invoked for the client to handle the server response.
+		 * See {@link CommStatus} for the respective values of the response data object.
 		 * @param status The server response code.
 		 * @param data The response data, if any response data was acquired.
 		 */
@@ -59,7 +74,7 @@ public class ServerCommunicator {
 	 * @param callback A callback invoked after the server response has been
 	 * attained. A Status code will indicate how the server responded.
 	 */
-	public void download(Context ctx, String videoUrl, CommCallback callback) {
+	public void download(Context ctx, String videoUrl, String videoId, CommCallback callback) {
 		
 		if (videoUrl == null) {
 			throw new IllegalArgumentException("Video URL should not be null");
@@ -68,11 +83,11 @@ public class ServerCommunicator {
         new getRemoteData_WebService(ctx, "downloadSchemedb",
         		new String[] {"TeamName", "VideoURL" },
         		new String[] {TEAM_NAME, videoUrl},
-            new DownloadHandler(ctx, callback));
+            new DownloadHandler(ctx, callback, videoId));
 	}
 	
 	public void download(Context ctx, VideoProperties videoProps, CommCallback callback) {
-        download(ctx, videoProps.getUrl(), callback);
+        download(ctx, videoProps.getUrl(), videoProps.getVideoId(), callback);
 	}
 	
 	/**
@@ -86,10 +101,12 @@ public class ServerCommunicator {
 		
 		private Context mContext;
 		private CommCallback cb;
+		private String reqVideoId;
 		
-		DownloadHandler(Context ctx, CommCallback callback) {
+		DownloadHandler(Context ctx, CommCallback callback, String videoId) {
 			mContext = ctx;
 			this.cb = callback;
+			this.reqVideoId = videoId;
 		}
 		
 		@Override
@@ -103,7 +120,7 @@ public class ServerCommunicator {
                 
                 if (OptPath != null && OptPath.length() > 1) {
                     String url = "http://" + getRemoteData_WebService.serverIP + OptPath.substring(1);
-                    new getRemoteData_WebService(mContext, url, new DownloadFileHandler(cb));
+                    new getRemoteData_WebService(mContext, url, new DownloadFileHandler(cb), reqVideoId);
                 } else {
                 	// File does not exist.
                 	cb.execute(CommStatus.DownloadNotFound, null);
@@ -128,9 +145,11 @@ public class ServerCommunicator {
         public void handleMessage(Message msg) {
             if (msg.what == MESSAGE_OK) {
                 String resStr = msg.getData().getString(MESSAGE_MSG);
-                
+                Log.i(TAG, "Download response " + resStr);
+                String filePath = msg.getData().getString("downloadedFile");
+                Log.i(TAG, "Downloaded file to " + filePath);
                 // File downloaded...
-                cb.execute(CommStatus.DownloadOk, resStr);
+                cb.execute(CommStatus.DownloadOk, filePath);
             } else {
             	// unexpected error?
             	cb.execute(CommStatus.DownloadFileFailed, msg);
@@ -160,6 +179,7 @@ public class ServerCommunicator {
 	        uploadfile(ctx, uploadBuffer, props, cb);
         } catch (IOException e) {
         	// TODO: handle exception
+        	Log.e(TAG, "Error uploading: " + e);
         } finally {
         	if (fis != null) {
         		try {
@@ -176,9 +196,12 @@ public class ServerCommunicator {
 	
     private void uploadfile(final Context ctx, String fileBytes, VideoProperties vidProps, CommCallback cb) {
         new getRemoteData_WebService(ctx, "UploadSchemedb",
-        		new String[] {"TeamName","VideoName" ,"VideoURL","VideoLgh",
-        						"OptStepLgh","OptDimLv","fileBase64Datas"},
-        		new String[] {TEAM_NAME, vidProps.getServerName(), vidProps.getUrl(),
+        		new String[] {"TeamName",
+        						"VideoName", "VideoURL",
+        						"VideoLgh", "OptStepLgh",
+        						"OptDimLv", "fileBase64Datas"},
+        		new String[] {TEAM_NAME,
+        						vidProps.getServerName(), vidProps.getUrl(),
         						vidProps.getLengthString(), vidProps.getOptStepLgh(),
         						vidProps.getOptDimLv(), fileBytes},
         		new UploadHandler(cb));

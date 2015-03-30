@@ -16,9 +16,9 @@ import android.util.Log;
  * @author Brian Rupert
  *
  */
-class VideoProcessingTask extends TimerTask {
+class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 	
-	public static final int PROCESSING_INTERVAL_MS = 1000;
+	public static final int PROCESSING_INTERVAL_MS = 500;
 	
 	private static final String TAG = "VideoProcessingTask";
 	
@@ -38,11 +38,16 @@ class VideoProcessingTask extends TimerTask {
 		this.context = context;
 		this.analyzer = new FrameAnalyzer(context);
 	}
+	
+	@Override
+	public int getCycleTime() {
+		return PROCESSING_INTERVAL_MS;
+	}
 
 	@Override
 	public void run() {
 		if (!doAnalysis) {
-			Log.d(TAG, "Paused mode - skipping analysis");
+			//Log.d(TAG, "Paused mode - skipping analysis");
 			return;
 		}
 		
@@ -98,6 +103,10 @@ class VideoProcessingTask extends TimerTask {
 			return;
 		}
 		
+		if (AppSettings.DEBUG) {
+			playerView.setDebugText("Mode: Analysis   Level: " + this.lastLevel);
+		}
+		
 		//Log.d(TAG, "doWork() on thread " + getCurrentThreadName());
 				
 		long start = System.nanoTime();
@@ -135,6 +144,8 @@ class VideoProcessingTask extends TimerTask {
 	/** Handles messages for background analysis. */
 	private CaptureHandler backgroundHandler;
 	
+	private volatile int lastLevel = 0;
+	
 	/**
 	 * Handler class for getting bitmaps off the UI thread and then
 	 * doing some processing off the UI thread.
@@ -158,7 +169,7 @@ class VideoProcessingTask extends TimerTask {
 			if (AppSettings.DEBUG) {
 				Log.v(TAG, "Got bitmap from message, starting analysis on thread " + getCurrentThreadName());
 			}
-			parent.analyzer.analyze(capData.getBitmap(), capData.getPosition());
+			parent.lastLevel = parent.analyzer.analyze(capData.getBitmap(), capData.getPosition());
 			// Need to release the resources used for the bitmap.
 			capData.getBitmap().recycle();
 		}

@@ -263,4 +263,11 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		}
 	}
 
+	@Override
+	public void setDebugText(String string) {
+		Context ctx = getContext();
+		PlayVideoActivity a = (PlayVideoActivity) ctx;
+		a.updateDebugText(string);
+	}
+
 }

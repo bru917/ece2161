@@ -1,5 +1,7 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import java.io.Serializable;
+
 import android.graphics.Bitmap;
 
 /**
@@ -8,24 +10,33 @@ import android.graphics.Bitmap;
  * @author Brian Rupert
  *
  */
-public class VideoProperties {
+public class VideoProperties implements Serializable {
+
+	private static final long serialVersionUID = 8077152057372795374L;
 
 	private String id;
 	
 	private String videoId;
 	
+	/** Server database field: VideoName. */
 	private String title;
 	
+	/** Server database field: VideoURL. */
 	private String url;
 	
-	private Bitmap thumbnail;
-	
+	/** Server database field: VideoLgh. */
 	private Long length;
 	
-	
+	/** Server database field: OptStepLgh. */
 	private String optStepLgh;
 	
+	/** Server database field: OptDimLv. */
 	private String optDimLv;
+	
+	
+	/** For UI display. */
+	private transient Bitmap thumbnail;
+	
 	
 	public VideoProperties() {
 		
@@ -72,7 +83,7 @@ public class VideoProperties {
 	public void setTitle(String title) {
 		this.title = title;
 	}
-
+	
 	public String getUrl() {
 		return url;
 	}

@@ -1,8 +1,11 @@
 package edu.pitt.ece2161.spring2015.optiplayer;
 
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.util.Timer;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
 import com.google.android.exoplayer.ExoPlaybackException;
 import com.google.android.exoplayer.ExoPlayer;
@@ -11,6 +14,7 @@ import com.google.android.exoplayer.drm.MediaDrmCallback;
 
 import edu.pitt.ece2161.spring2015.optiplayer.ServerCommunicator.CommCallback;
 import edu.pitt.ece2161.spring2015.optiplayer.ServerCommunicator.CommStatus;
+import edu.pitt.ece2161.spring2015.optiplayer.VideoAnalysisDataset.DataEntry;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
@@ -19,10 +23,12 @@ import android.content.DialogInterface;
 import android.content.DialogInterface.OnDismissListener;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
+import android.content.res.Configuration;
 import android.graphics.SurfaceTexture;
 import android.media.MediaDrm.KeyRequest;
 import android.media.MediaDrm.ProvisionRequest;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
@@ -38,6 +44,7 @@ import android.view.View;
 import android.view.View.OnTouchListener;
 import android.widget.MediaController;
 import android.widget.TextView;
+import android.widget.Toast;
 
 /**
  * This activity is used to play the video content.
@@ -51,6 +58,8 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 	private static final String TAG = "PlayVideoActivity";
 	
 	public static final String VIDEO_ID = "VideoID";
+	public static final String VIDEO_TITLE = "VideoTitle";
+	public static final String VIDEO_URL = "VideoURL";
 	public static final String LOCAL_VIDEO_PATH = "LocalVideoPath";
 
 	//private VideoSurfaceView surfaceView;
@@ -62,15 +71,21 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 	private long playerPosition = 0;
 	private boolean enableBackgroundAudio;
 
-	private String videoId;
+	private VideoProperties videoProperties;
 	private String localVideoFile;
 	
 	private TextView debugText;
 	
-	private VideoProcessingTask processingTask;
-	private Timer processingTaskTimer;
+	private Mode mode = null;
+	private VideoBackgroundTask backgroundTask;
+	private Timer backgroundTaskTimer;
 	
 	private Integer origBrightnessSetting;
+	
+	private enum Mode {
+		Analysis,
+		Playback
+	}
 	
 	/**
 	 * Gets the surface to be drawn on by the MediaCodec.
@@ -122,11 +137,44 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		}
 
 		// Pull the video ID that should be streamed.
-		this.videoId = this.getIntent().getExtras().getString(VIDEO_ID);
+		this.videoProperties = getVideoProperties(this.getIntent().getExtras());
+		
 		this.localVideoFile = this.getIntent().getExtras().getString(LOCAL_VIDEO_PATH);
-		// Without a video ID, there is nothing to wait for or download.
-		if (this.videoId != null) {
-			requestDimmingFile(videoId);
+		// Without a youtube video, there is nothing to wait for or download.
+		if (this.videoProperties != null) {
+			// Check for local file:
+			final File localFile = AppSettings.getInstance()
+					.getLocalAnalysisFile(this.videoProperties.getVideoId());
+			
+			Log.d(TAG, "Checking for cached file " + localFile);
+			if (localFile.exists()) {
+				Log.d(TAG, "Found cached file");
+				
+				// Begin playback on dismissal of the dialog.
+				OnDismissListener odl = new OnDismissListener() {
+					@Override
+					public void onDismiss(DialogInterface dialog) {
+						ProgressDialog d = new ProgressDialog(PlayVideoActivity.this);
+						d.setTitle("Preparing");
+						d.setMessage("Please Wait...");
+						d.setIndeterminate(true);
+						d.show();
+						beginPlayingVideo(localFile, d);
+					}
+				};
+				
+				new AlertDialog.Builder(PlayVideoActivity.this)
+					.setTitle("Dimming Information")
+					.setMessage("Reading locally cached dimming file")
+					.setCancelable(false)
+					.setPositiveButton("Play", null)
+					.setOnDismissListener(odl)
+					.show();
+				
+			} else {
+				// Ask server for file:
+				requestDimmingFile(this.videoProperties.getVideoId());
+			}
 		}
 
 		mediaController = new MediaController(this);
@@ -148,6 +196,10 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 				preparePlayer();
 				
 				surfaceView.setPlayer(player);
+				
+				if (mode == Mode.Playback) {
+					player.setPlayWhenReady(true);
+				}
 			}
 
 			@Override
@@ -169,9 +221,21 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 				//Log.v(TAG, "onSurfaceTextureUpdated -> " + surface);
 			}
 		});
-
+		Log.i(TAG, "Activity creation complete");
 	}
-	
+
+	private VideoProperties getVideoProperties(Bundle extras) {
+		String vidId = extras.getString(VIDEO_ID);
+		if (vidId == null || vidId.isEmpty()) {
+			return null;
+		}
+		VideoProperties props = new VideoProperties();
+		props.setVideoId(vidId);
+		props.setTitle(extras.getString(VIDEO_TITLE));
+		props.setUrl(extras.getString(VIDEO_URL));
+		return props;
+	}
+
 	@Override
 	public void onStart() {
 		super.onStart();
@@ -195,7 +259,7 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			player.setBackgrounded(true);
 		}
 		
-		setAnalysisMode(AnalysisMode.PAUSE);
+		setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
 	}
 	
 	@Override
@@ -220,7 +284,14 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		
 		releasePlayer();
 		
-		setAnalysisMode(AnalysisMode.STOP);
+		setBackgroundTaskMode(BackgroundTaskMode.STOP);
+	}
+	
+	@Override
+	public void onConfigurationChanged(Configuration cfg) {
+		super.onConfigurationChanged(cfg);
+		// DOESNT WORK??
+		Log.i(TAG, "Configuration changed -> " + cfg);
 	}
 	
 	/**
@@ -244,72 +315,109 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		progress.setTitle("Please wait");
 		progress.setMessage("Loading video...");
 		progress.setIndeterminate(true);
-		progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+		//progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
 		progress.setProgress(0);
 		progress.show();
 		// Set up a request to the dimming server.
-		ServerCommunicator comm = new ServerCommunicator();
-		CommCallback cb = new CommCallback() {
-			@Override
-			public void execute(CommStatus statusCode, Object data) {
-				
-				String msg = statusCode.toString();
-				if (statusCode == CommStatus.DownloadNotFound) {
-					msg = "A dimming file does not exist yet";
-				} else if (statusCode == CommStatus.DownloadOk) {
-					// Show nothing, just start playing.
-					msg = null;
-				}
-				
-				if (msg != null) {
-					// Begin playback on dismissal of the dialog.
+		final ServerCommunicator comm = new ServerCommunicator();
+		final RequestFileCallback cb = new RequestFileCallback(progress);
+		// Request any existing dimming information.
+		Log.d(TAG, "Beginning download request");
+		comm.download(PlayVideoActivity.this, videoProperties, cb);
+	}
+	
+	private class RequestFileCallback implements CommCallback {
+		
+		private ProgressDialog progress;
+		
+		RequestFileCallback(ProgressDialog progress) {
+			this.progress = progress;
+		}
+		
+		@Override
+		public void execute(final CommStatus statusCode, final Object data) {
+			
+			Runnable r = new Runnable() {
+				public void run() {
+					
+					String filePath = null;
+					String msg = statusCode.toString();
+					if (statusCode == CommStatus.DownloadNotFound) {
+						msg = "A dimming file does not exist yet";
+					} else if (statusCode == CommStatus.DownloadOk) {
+						msg = "Dimming file was downloaded";
+						filePath = (String) data;
+					}
+					
+					File f = null;
+					if (filePath != null) {
+						f = new File(filePath);
+					}
+					final File ff = f;
 					OnDismissListener odl = new OnDismissListener() {
 						@Override
 						public void onDismiss(DialogInterface dialog) {
-							player.setPlayWhenReady(true);
+							beginPlayingVideo(ff, RequestFileCallback.this.progress);
 						}
 					};
 					
 					new AlertDialog.Builder(PlayVideoActivity.this)
-							.setTitle("Dimming Information")
-							.setMessage(msg)
-							.setCancelable(false)
-							.setPositiveButton("Play", null)
-							.setOnDismissListener(odl)
-							.show();
-				} else {
-					// TODO assign downloaded file into the playback
-					// background service.
-					
-					player.setPlayWhenReady(true);
+						.setTitle("Dimming Information")
+						.setMessage(msg)
+						.setCancelable(false)
+						.setPositiveButton("Play", null)
+						.setOnDismissListener(odl)
+						.show();
 				}
-				
-				progress.dismiss();
+			};
+			
+			PlayVideoActivity.this.runOnUiThread(r);
+		}
+	}
+	
+	private void beginPlayingVideo(final File dimmingFile, final ProgressDialog progress) {
+		Thread t = new Thread() {
+			public void run() {
+				if (dimmingFile != null) {
+					if (!prepareFilePlayback(dimmingFile)) {
+						// File parsing error.
+						mode = Mode.Analysis;
+					} else {
+						mode = Mode.Playback;
+					}
+				} else {
+					mode = Mode.Analysis;
+				}
+				player.setPlayWhenReady(true);
+				if (progress != null) {
+					progress.dismiss();
+				}
 			}
 		};
-		// Request any existing dimming information.
-		comm.download(this, videoId, cb);
+		t.start();
 	}
 
 	/**
 	 * Begins preparing the video player resources.
 	 */
 	private void preparePlayer() {
-		
-		String url = VideoUrlProcessor.getDashUrl(this, videoId);
-		String id = videoId;
+		String videoId = null;
+		if (this.videoProperties != null) {
+			videoId = this.videoProperties.getVideoId();
+		}
 
 		if (player == null) {
 			MediaDrmCallback drmCallback = new MyDrmCallback();
 
 			ExoRendererBuilder rb;
-			if (id == null) {
+			if (videoId == null) {
 				// Play local video file:
 				rb = new ExoDefaultRendererBuilder(this, Uri.parse(this.localVideoFile));
 				
 			} else {
 				// Play video using DASH streaming:
-				rb = new ExoDashRendererBuilder(getUserAgent(this), url, id, drmCallback, null);
+				String dashManifestURL = VideoUrlProcessor.getDashUrl(this, videoId);
+				rb = new ExoDashRendererBuilder(getUserAgent(this), dashManifestURL, videoId, drmCallback, null);
 			}
 			
 			player = new CustomPlayer(rb, this);
@@ -325,42 +433,128 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			// updateButtonVisibilities();
 		}
 		player.setSurface(getVideoSurface());
+		// PlayWhenReady is set after we get our dimming file response.
+		// We will set up either in analysis mode or replay mode.
 		player.setPlayWhenReady(false);
 	}
 	
-	public enum AnalysisMode {
+	public enum BackgroundTaskMode {
 		RUN,
 		PAUSE,
 		STOP;
 	}
 	
-	private void setAnalysisMode(AnalysisMode mode) {
+	private void setBackgroundTaskMode(BackgroundTaskMode mode) {
 		switch(mode) {
 		case RUN:
 			// Set-up background processing.
-			if (processingTask == null) {
-				processingTaskTimer = new Timer();
-				processingTask = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
-				processingTaskTimer.schedule(processingTask, 500, VideoProcessingTask.PROCESSING_INTERVAL_MS);
+			if (backgroundTaskTimer == null) {
+				backgroundTaskTimer = new Timer();
+				if (this.mode == Mode.Analysis) {
+					VideoProcessingTask t = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
+					backgroundTask = t;
+					
+					backgroundTaskTimer.schedule(t, 100, t.getCycleTime());
+				} else if (this.mode == Mode.Playback) {
+
+					FrameAnalysisPlayback t = (FrameAnalysisPlayback) backgroundTask;
+					
+					backgroundTaskTimer.schedule(t, 100, t.getCycleTime());
+				} else {
+					throw new IllegalStateException("oops");
+				}
 			}
-			processingTask.setRunning();
+			backgroundTask.setRunning();
 			break;
 		case PAUSE:
-			if (processingTask != null) {
-				// TODO pause so we dont run analysis while paused.
-				processingTask.setPaused();
+			if (backgroundTaskTimer != null) {
+				backgroundTask.setPaused();
 			}
 			break;
 		case STOP:
-			if (processingTask != null) {
-				processingTask.cancel();
-				processingTaskTimer.cancel();
+			if (backgroundTaskTimer != null) {
+				backgroundTask.cancel();
+				backgroundTaskTimer.cancel();
 				
-				processingTask = null;
-				processingTaskTimer = null;
+				backgroundTask = null;
+				backgroundTaskTimer = null;
 			}
 			break;
 		}
+	}
+	
+	/**
+	 * Store video analysis data to a file.
+	 * @param data
+	 */
+	private void saveResults(final VideoAnalysisDataset data, final VideoProperties props) {
+		//printToLog(data);
+		
+		final SaveAnalysisTask task = new SaveAnalysisTask(this, data);
+		
+		
+		Thread t = new Thread() {
+			public void run() {
+				File file = null;
+				try {
+					file = task.get();
+				} catch (InterruptedException e) {
+					Log.e(TAG, "SaveAnalysisTask Error " + e);
+				} catch (ExecutionException e) {
+					Log.e(TAG, "SaveAnalysisTask Error " + e);
+				}
+				
+				if (file == null) {
+					// File save failed.
+					
+					
+					// Do not try to push to the server.
+					return;
+				}
+				
+				if (props != null) {
+					final String filePath = file.getAbsolutePath();
+					
+					final CommCallback cb = new CommCallback() {
+						@Override
+						public void execute(CommStatus status, Object data) {
+							new AlertDialog.Builder(PlayVideoActivity.this)
+								.setTitle("Upload Result")
+								.setMessage(String.valueOf(status)
+										+ "\n\nServer Response: " + data
+										+ "\n\nThank you!")
+								.show();
+						}
+					};
+					
+					// Set up a request to the dimming server.
+					Thread serverCommThread = new Thread() {
+						public void run() {
+							ServerCommunicator comm = new ServerCommunicator();
+							comm.upload(PlayVideoActivity.this, filePath, props, cb);
+						}
+					};
+					runOnUiThread(serverCommThread);
+				}
+			}
+		};
+		
+		task.execute();
+		t.start();
+	}
+	
+	/**
+	 * Writes the data set to the debug log.
+	 * @param data The data to write.
+	 */
+	protected static void printToLog(VideoAnalysisDataset data) {
+		Log.v(TAG, "======  <RESULTS>  ======");
+		int i = 0;
+		for (DataEntry d : data.getDataList()) {
+			Log.v(TAG, "  DATA[" + i + "] -> position=" + d.getPosition() + " level=" + d.getLevel());
+			i++;
+		}
+		Log.v(TAG, "======  </RESULTS>  ======");
 	}
 	
 	/**
@@ -497,19 +691,34 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			break;
 		case ExoPlayer.STATE_BUFFERING:
 			// Probably waiting for data to come in on the stream.
-			setAnalysisMode(AnalysisMode.PAUSE);
+			setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
 			break;
 		case ExoPlayer.STATE_READY:
 			if (playWhenReady) {
 				// Starting to play.
-				setAnalysisMode(AnalysisMode.RUN);
+				setBackgroundTaskMode(BackgroundTaskMode.RUN);
 			} else {
 				// Paused.
-				setAnalysisMode(AnalysisMode.PAUSE);
+				setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
 			}
 			break;
 		case ExoPlayer.STATE_ENDED:
-			setAnalysisMode(AnalysisMode.PAUSE);
+			setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
+			
+			if (backgroundTask instanceof VideoProcessingTask) {
+				// Done playing...
+				VideoProcessingTask t = (VideoProcessingTask) backgroundTask;
+				VideoAnalysisDataset data = t.getDataset();
+				data.setVideoId(this.videoProperties.getVideoId());
+				
+				// Fill in properties that would not have been set yet.
+				this.videoProperties.setLength(this.player.getDuration());
+				this.videoProperties.setOptDimLv("1");
+				this.videoProperties.setOptStepLgh(String.valueOf(backgroundTask.getCycleTime()));
+				
+				saveResults(data, this.videoProperties);
+			}
+			
 			showControls();
 			break;
 		default:
@@ -525,5 +734,31 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 	@Override
 	public void onPlayWhenReadyCommitted() {
 		Log.i(TAG, "onPlayWhenReadyCommitted()");
+	}
+	
+	private boolean prepareFilePlayback(File localFile) {
+		VideoAnalysisFileHandler fh = new VideoAnalysisFileHandler();
+		VideoAnalysisDataset data = null;
+		try {
+			data = fh.readFlatFile(localFile);
+		} catch (Exception e) {
+			Log.e(TAG, "Error reading file: " + e);
+			Toast.makeText(this, "Error Reading Cache", Toast.LENGTH_SHORT).show();
+			// Try to delete the bogus file...
+			localFile.delete();
+			// Change to analysis mode.
+			return false;
+		}
+		
+		backgroundTask = new FrameAnalysisPlayback(this, data);
+		return true;
+	}
+
+	public CustomPlayer getPlayer() {
+		return this.player;
+	}
+	
+	public CustomView getPlayerView() {
+		return this.surfaceView;
 	}
 }

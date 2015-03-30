@@ -16,12 +16,15 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.net.URLConnection;
+
 import org.ksoap2.SoapEnvelope;
 import org.ksoap2.serialization.SoapObject;
 import org.ksoap2.serialization.SoapSerializationEnvelope;
 import org.ksoap2.transport.HttpTransportSE;
 import org.ksoap2.transport.ServiceConnection;
 import org.ksoap2.transport.ServiceConnectionSE;
+
+import edu.pitt.ece2161.spring2015.optiplayer.AppSettings;
 import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -39,7 +42,7 @@ public class getRemoteData_WebService {
     private String methodName = null;
     private SoapObject request = null;
     //private final int timeOut1 = 4 * 1000; //
-    public final static String files_PATH = Environment.getExternalStorageDirectory() + "/";
+   // public final static String files_PATH = Environment.getExternalStorageDirectory() + "/";
 
     // construct function
     public getRemoteData_WebService() {
@@ -95,14 +98,22 @@ public class getRemoteData_WebService {
 
 
     //get http download
-    public getRemoteData_WebService(Context mContext, final String fileUrl,final Handler netHandler)  {
+    public getRemoteData_WebService(Context mContext, final String fileUrl,final Handler netHandler, final String videoId)  {
         Runnable downloadRun = new Runnable() {
             @Override
             public void run() {
                 // TODO Auto-generated method stub
                 String jgstr="";
-                String newFilename = fileUrl.substring(fileUrl.lastIndexOf("/")+1);
-                newFilename = files_PATH + newFilename;
+                String newFilename = null;
+                String files_PATH = AppSettings.getInstance().getStorageFolder();
+                if (videoId == null) {
+                    newFilename = fileUrl.substring(fileUrl.lastIndexOf("/")+1);
+                    newFilename = files_PATH + newFilename;
+                } else {
+	                newFilename = AppSettings.getInstance().getLocalAnalysisFile(videoId).getAbsolutePath();
+                }
+                
+                
                 File dirFile = new File(files_PATH);
                 if (!dirFile.exists()) {
                     try {
@@ -140,6 +151,8 @@ public class getRemoteData_WebService {
                 msg.what=1;
                 Bundle data=new Bundle();
                 data.putString("jgstr",jgstr);
+                //BJR include reference to file path.
+                data.putString("downloadedFile", newFilename);
                 msg.setData(data);
                 netHandler.sendMessage(msg);
             }

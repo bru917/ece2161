@@ -126,7 +126,7 @@ public class FrameAnalyzer {
 	 * @param level
 	 * @return
 	 */
-	private static int getBrightness(int level) {
+	public static int getBrightness(int level) {
 		int brightness = 10;
 		switch (level) {
 		case 0:
