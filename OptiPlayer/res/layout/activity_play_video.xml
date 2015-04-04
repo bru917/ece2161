@@ -3,7 +3,7 @@
     android:id="@+id/vRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#111"
+    android:background="#000"
     android:keepScreenOn="true"
     tools:context="edu.pitt.ece2161.spring2015.optiplayer.PlayVideoActivity"
     android:configChanges="orientation"
