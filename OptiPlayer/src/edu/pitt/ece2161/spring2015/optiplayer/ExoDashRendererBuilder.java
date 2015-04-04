@@ -225,7 +225,7 @@ public class ExoDashRendererBuilder implements ExoRendererBuilder, ManifestCallb
 			
 			//debugRenderer = debugTextView != null
 			//		? new DebugTrackRenderer(debugTextView, videoRenderer, videoSampleSource) : null;
-			 
+			debugRenderer = null;
 		}
 
 		// Build the audio chunk sources.
@@ -317,7 +317,7 @@ public class ExoDashRendererBuilder implements ExoRendererBuilder, ManifestCallb
 		// Invoke the callback.
 		String[][] trackNames = new String[CustomPlayer.RENDERER_COUNT][];
 		trackNames[CustomPlayer.TYPE_AUDIO] = audioTrackNames;
-		// trackNames[CustomPlayer.TYPE_TEXT] = textTrackNames;
+		trackNames[CustomPlayer.TYPE_TEXT] = textTrackNames;
 
 		MultiTrackChunkSource[] multiTrackChunkSources = new MultiTrackChunkSource[CustomPlayer.RENDERER_COUNT];
 		multiTrackChunkSources[CustomPlayer.TYPE_AUDIO] = audioChunkSource;
@@ -326,8 +326,8 @@ public class ExoDashRendererBuilder implements ExoRendererBuilder, ManifestCallb
 		TrackRenderer[] renderers = new TrackRenderer[CustomPlayer.RENDERER_COUNT];
 		renderers[CustomPlayer.TYPE_VIDEO] = videoRenderer;
 		renderers[CustomPlayer.TYPE_AUDIO] = audioRenderer;
-		// renderers[CustomPlayer.TYPE_TEXT] = textRenderer;
-		// renderers[CustomPlayer.TYPE_DEBUG] = debugRenderer;
+		renderers[CustomPlayer.TYPE_TEXT] = textRenderer;
+		renderers[CustomPlayer.TYPE_DEBUG] = debugRenderer;
 		player.onRenderers(trackNames, multiTrackChunkSources, renderers);
 	}
 
