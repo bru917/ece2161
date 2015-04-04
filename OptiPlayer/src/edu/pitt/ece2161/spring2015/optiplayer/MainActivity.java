@@ -19,6 +19,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -44,6 +45,9 @@ public class MainActivity extends Activity implements OnItemClickListener {
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
+		requestWindowFeature(Window.FEATURE_PROGRESS);
+		getWindow().setFeatureInt(Window.FEATURE_PROGRESS, 10000);
+		
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
@@ -129,7 +133,6 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		TextView txt = (TextView) findViewById(R.id.searchText);
 		String queryTerm = txt.getText().toString();
 		
-		final ProgressDialog progress = new ProgressDialog(this);
 		final VideoSearchTask task = new VideoSearchTask(this) {
 			
 			@Override
@@ -141,7 +144,7 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			protected void onPostExecute(List<VideoProperties> results) {
 				super.onPostExecute(results);
 				
-				progress.dismiss();
+				getWindow().setFeatureInt(Window.FEATURE_PROGRESS, 10000);
 				
 				if (this.getException() != null) {
 					Exception e = this.getException();
@@ -174,23 +177,11 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			@Override
 			protected void onProgressUpdate(Integer... values) {
 				if (values != null && values.length > 0) {
-					progress.setProgress(values[0]);
+					getWindow().setFeatureInt(Window.FEATURE_PROGRESS, 100 * values[0]);
 				}
 			}
 		};
-		progress.setTitle("Searching");
-		progress.setIndeterminate(false);
-		progress.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-		progress.setCancelable(true);
-		progress.setMax(task.getProgressMax());
-		progress.setOnCancelListener(new OnCancelListener() {
-			@Override
-			public void onCancel(DialogInterface dialog) {
-				// User pressed 'cancel' in the progress dialog.
-				task.cancel(true);
-			}
-		});
-		progress.show();
+		getWindow().setFeatureInt(Window.FEATURE_PROGRESS, 0);
 		
 		task.execute(queryTerm);
 		

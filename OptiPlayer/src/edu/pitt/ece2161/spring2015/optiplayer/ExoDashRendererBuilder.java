@@ -117,8 +117,7 @@ public class ExoDashRendererBuilder implements ExoRendererBuilder, ManifestCallb
 
 			@Override
 			public void onBandwidthSample(int elapsedMs, long bytes, long bitrateEstimate) {
-				// TODO Auto-generated method stub
-				Log.i(TAG, "onBandwidthSample -> " + elapsedMs);
+				Log.v(TAG, "onBandwidthSample -> " + elapsedMs);
 			}
 
 		};

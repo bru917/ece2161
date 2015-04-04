@@ -91,12 +91,12 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 			search.setFields("items(id/kind,id/videoId,snippet/title,snippet/thumbnails/default/url)");
 			search.setMaxResults((long) maxResults);
 
-			publishProgress(1);
+			publishProgress(10);
 
 			// Call the API and print results.
 			SearchListResponse searchResponse = search.execute();
 
-			publishProgress(2);
+			publishProgress(20);
 
 			List<SearchResult> searchResultList = searchResponse.getItems();
 
@@ -149,7 +149,7 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 
 		List<VideoProperties> newlist = new ArrayList<VideoProperties>();
 
-		int i = 1;
+		int prog = 30;
 
 		Map<VideoProperties, String> imageUrlMap = new LinkedHashMap<VideoProperties, String>();
 
@@ -182,8 +182,8 @@ public class VideoSearchTask extends AsyncTask<String, Integer, List<VideoProper
 			}
 			newlist.add(info);
 
-			this.publishProgress(2 + i);
-			i++;
+			this.publishProgress(prog);
+			prog += 10;
 		}
 
 		ImageDownloadTask imgDownloader = new ImageDownloadTask((MainActivity) ctx);
