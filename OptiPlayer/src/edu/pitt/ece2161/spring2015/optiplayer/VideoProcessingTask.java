@@ -104,7 +104,8 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 		}
 		
 		if (AppSettings.DEBUG) {
-			playerView.setDebugText("Mode: Analysis   Level: " + this.lastLevel);
+			int brightness = FrameAnalyzer.getBrightness(this.lastLevel);
+			playerView.setDebugText("Mode: Analysis   Level: " + this.lastLevel + "  Brightness: " + brightness);
 		}
 		
 		//Log.d(TAG, "doWork() on thread " + getCurrentThreadName());
@@ -156,12 +157,16 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 		
 		private VideoProcessingTask parent;
 		
+		private double avgProcessingTime = 0;
+		private int avgProcessingCount = 0;
+		
 		CaptureHandler(VideoProcessingTask parent) {
 			this.parent = parent;
 		}
 		
 		@Override
 		public void handleMessage(Message msg) {
+			long start = System.nanoTime();
 			if (msg == null || msg.what != CAPTURE_MSG) {
 				return;
 			}
@@ -172,10 +177,23 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 			parent.lastLevel = parent.analyzer.analyze(capData.getBitmap(), capData.getPosition());
 			// Need to release the resources used for the bitmap.
 			capData.getBitmap().recycle();
+			
+			if (AppSettings.DEBUG) {
+				// Keep a running average of the time it took to process the frame.
+				long time = System.nanoTime() - start;
+				avgProcessingTime = (avgProcessingTime * avgProcessingCount + time) / (avgProcessingCount + 1);
+				avgProcessingCount++;
+			}
 		}
 		
 		private void cancel() {
 			this.removeCallbacksAndMessages(null);
+			
+			if (AppSettings.DEBUG) {
+				Log.i(TAG, "Average frame processing time is "
+						+ NumberFormat.getNumberInstance().format(avgProcessingTime / 1000000)
+						+ "ms over " + avgProcessingCount + " cycles.");
+			}
 		}
 	}
 	

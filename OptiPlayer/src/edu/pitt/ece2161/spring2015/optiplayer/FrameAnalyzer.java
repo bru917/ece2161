@@ -31,9 +31,10 @@ public class FrameAnalyzer {
 	 * @param currentPositionMs The current position in the video (ms).
 	 */
 	public int analyze(Bitmap img, long currentPositionMs) {
-		long start = System.currentTimeMillis();
+		long start = 0;
 		
 		if (AppSettings.DEBUG) {
+			start = System.currentTimeMillis();
 			if (Looper.myLooper() == Looper.getMainLooper()) {
 				// Note that we should AVOID running this on the main thread
 				// because it will cause some serious lag on the video.
