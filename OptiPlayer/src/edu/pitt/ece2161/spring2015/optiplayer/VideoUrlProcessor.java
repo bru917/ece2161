@@ -6,7 +6,6 @@ import java.io.IOException;
 import org.apache.http.HttpResponse;
 import org.apache.http.HttpStatus;
 import org.apache.http.StatusLine;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
@@ -45,6 +44,7 @@ final class VideoUrlProcessor {
 		        HttpResponse response;
 		        String responseString = null;
 		        try {
+		        	// Fetch the content at the URL
 		            response = client.execute(new HttpGet(url));
 		            StatusLine statusLine = response.getStatusLine();
 		            if (statusLine.getStatusCode() == HttpStatus.SC_OK) {
@@ -52,17 +52,18 @@ final class VideoUrlProcessor {
 		                response.getEntity().writeTo(out);
 		                responseString = out.toString();
 		                out.close();
-		            } else{
-		                //Closes the connection.
+		            } else {
+		                // Close the connection.
 		                response.getEntity().getContent().close();
 		                throw new IOException(statusLine.getReasonPhrase());
 		            }
-		        } catch (ClientProtocolException e) {
-		            //TODO
-		        } catch (IOException e) {
-		            //TODO
+		        } catch (Exception e) {
+		            Log.e(TAG, "Error while fetching Youtube DASH manifest URL: " + e);
 		        }
 		        
+		        Log.v(TAG, "Inspecting page " + url);
+		        
+		        // Process the content for a DASH manifest URL
 		        int dashStart = responseString.indexOf("\"" + DASH_KEY + "\"");
 		        if (dashStart > 0) {
 		        	
@@ -93,6 +94,7 @@ final class VideoUrlProcessor {
 		        	
 		        	responseString = dashUrl;
 		        } else {
+		        	Log.e(TAG, "Couldn't find DASH manifest link at " + url);
 		        	responseString = null;
 		        }
 		        
