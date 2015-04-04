@@ -20,6 +20,8 @@ package edu.pitt.ece2161.spring2015.optiplayer;
  */
 public final class UnsupportedDrmException extends Exception {
 
+	private static final long serialVersionUID = 7535967160810634912L;
+	
 	public static final int REASON_NO_DRM = 0;
 	public static final int REASON_UNSUPPORTED_SCHEME = 1;
 	public static final int REASON_UNKNOWN = 2;

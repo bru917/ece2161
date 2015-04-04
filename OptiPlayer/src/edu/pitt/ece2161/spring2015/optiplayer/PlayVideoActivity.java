@@ -2,7 +2,6 @@ package edu.pitt.ece2161.spring2015.optiplayer;
 
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.Timer;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -28,7 +27,6 @@ import android.graphics.SurfaceTexture;
 import android.media.MediaDrm.KeyRequest;
 import android.media.MediaDrm.ProvisionRequest;
 import android.net.Uri;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
