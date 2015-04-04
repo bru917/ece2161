@@ -19,6 +19,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.BaseAdapter;
@@ -192,6 +193,10 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		progress.show();
 		
 		task.execute(queryTerm);
+		
+		// Hide keyboard control to better display video results.
+		InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+		imm.hideSoftInputFromWindow(txt.getWindowToken(), 0);
 	}
 	
 	
@@ -244,6 +249,9 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			TextView descText = (TextView) convertView.findViewById(R.id.resultDescription);
 			descText.setText(null);
 			
+			TextView lengthText = (TextView) convertView.findViewById(R.id.videoLength);
+			lengthText.setText(formatDuration(info.getLength()));
+			
 			final ImageView img = (ImageView) convertView.findViewById(R.id.resultImage);
 			if (info.getThumbnail() != null) {
 				img.setImageBitmap(info.getThumbnail());
@@ -255,6 +263,35 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			return convertView;
 		}
 		
+	}
+	
+	private static String formatDuration(Long duration) {
+		if (duration == null || duration == 0) {
+			return "";
+		}
+		
+		StringBuilder sb = new StringBuilder();
+		long seconds = duration % 60;
+		long minutes = duration / 60;
+		long hours = duration / 3600;
+	
+		if (hours > 0) {
+			sb.append(hours);
+			sb.append(":");
+			if (minutes == 0) {
+				sb.append("00");
+			} else if (minutes < 10) {
+				sb.append("0");
+			}
+		}
+		sb.append(String.valueOf(minutes));
+		sb.append(":");
+		if (seconds < 10) {
+			sb.append("0");
+		}
+		sb.append(String.valueOf(seconds));
+		
+		return sb.toString();
 	}
 
 	public void updateListView() {

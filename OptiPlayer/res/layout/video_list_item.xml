@@ -36,5 +36,17 @@
         android:layout_alignParentBottom="true"
         android:text="@string/list_default_description"
         android:textAppearance="?android:attr/textAppearanceSmall" />
+
+    <TextView
+        android:id="@+id/videoLength"
+        android:layout_width="wrap_content"
+        android:layout_height="20dp"
+        android:layout_alignEnd="@+id/resultImage"
+        android:layout_alignParentBottom="true"
+        android:layout_alignRight="@+id/resultImage"
+        android:layout_marginBottom="6dp"
+        android:text="@string/list_default_length"
+        android:textColor="#b0dddddd"
+        android:textSize="8pt" />
   
 </RelativeLayout>
