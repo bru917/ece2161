@@ -20,6 +20,7 @@ import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.DialogInterface.OnDismissListener;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.content.res.Configuration;
@@ -61,8 +62,11 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 	public static final String VIDEO_TITLE = "VideoTitle";
 	public static final String VIDEO_URL = "VideoURL";
 	public static final String LOCAL_VIDEO_PATH = "LocalVideoPath";
+	
+	private static final String STATE_PLAYER_POSITION = "PLAYER_POSITION";
+	private static final String STATE_ORIG_BACKLIGHT = "STATE_ORIG_BACKLIGHT";
+	private static final String STATE_DASH_MANIFEST = "STATE_DASH_MANIFEST";
 
-	//private VideoSurfaceView surfaceView;
 	private CustomView surfaceView;
 	private MediaController mediaController;
 
@@ -81,6 +85,7 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 	private Timer backgroundTaskTimer;
 	
 	private Integer origBrightnessSetting;
+	private String dashManifestUrl;
 	
 	private enum Mode {
 		Analysis,
@@ -109,12 +114,31 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		Log.i(TAG, "Activity is being CREATED");
 		
 		// Remember the original brightness setting, to restore it later.
-		try {
-			origBrightnessSetting = Settings.System.getInt(
-					getContentResolver(), Settings.System.SCREEN_BRIGHTNESS);
-			Log.d(TAG, "Saved original brightness level of " + this.origBrightnessSetting);
-		} catch (SettingNotFoundException e) {
-			origBrightnessSetting = null;
+		int bl = -1;
+		if (savedInstanceState != null) {
+			bl = savedInstanceState.getInt(STATE_ORIG_BACKLIGHT, -1);
+		}
+		if (bl > 0) {
+			origBrightnessSetting = bl;
+		} else {
+			try {
+				origBrightnessSetting = Settings.System.getInt(
+						getContentResolver(), Settings.System.SCREEN_BRIGHTNESS);
+				Log.d(TAG, "Saved original brightness level of " + this.origBrightnessSetting);
+			} catch (SettingNotFoundException e) {
+				origBrightnessSetting = null;
+			}
+		}
+		
+		if (savedInstanceState != null) {
+			// Check if there is a player position due to activity restart
+			// while playing the video
+			long pos = savedInstanceState.getLong(STATE_PLAYER_POSITION, -1L);
+			if (pos > 0) {
+				this.playerPosition = pos;
+			}
+			
+			this.dashManifestUrl = savedInstanceState.getString(STATE_DASH_MANIFEST, null);
 		}
 
 		final View root = findViewById(R.id.vRoot);
@@ -156,26 +180,27 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			if (localFile.exists()) {
 				Log.d(TAG, "Found cached file");
 				
-				// Begin playback on dismissal of the dialog.
-				OnDismissListener odl = new OnDismissListener() {
-					@Override
-					public void onDismiss(DialogInterface dialog) {
-						ProgressDialog d = new ProgressDialog(PlayVideoActivity.this);
-						d.setTitle("Preparing");
-						d.setMessage("Please Wait...");
-						d.setIndeterminate(true);
-						d.show();
-						beginPlayingVideo(localFile, d);
+				if (AppSettings.DEBUG) {
+					if (savedInstanceState == null) {
+						// Begin playback on dismissal of the dialog.
+						OnDismissListener odl = new OnDismissListener() {
+							@Override
+							public void onDismiss(DialogInterface dialog) {
+								beginPlayingVideo(localFile, null);
+							}
+						};
+						
+						new AlertDialog.Builder(PlayVideoActivity.this)
+							.setTitle("Dimming Information")
+							.setMessage("Reading locally cached dimming file")
+							.setCancelable(false)
+							.setPositiveButton("Play", null)
+							.setOnDismissListener(odl)
+							.show();
 					}
-				};
-				
-				new AlertDialog.Builder(PlayVideoActivity.this)
-					.setTitle("Dimming Information")
-					.setMessage("Reading locally cached dimming file")
-					.setCancelable(false)
-					.setPositiveButton("Play", null)
-					.setOnDismissListener(odl)
-					.show();
+				} else {
+					beginPlayingVideo(localFile, null);
+				}
 				
 			} else {
 				// Ask server for file:
@@ -203,8 +228,9 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 				
 				surfaceView.setPlayer(player);
 				
-				if (mode == Mode.Playback) {
-					player.setPlayWhenReady(true);
+				if (isPlaybackMode()) {
+					// When in playback mode, we can immediately begin to play
+					setPlayWhenReady();
 				}
 			}
 
@@ -253,6 +279,15 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		super.onResume();
 		Log.i(TAG, "Activity is being RESUMED");
 	}
+	
+	@Override
+	public void onSaveInstanceState(Bundle outState) {
+		super.onSaveInstanceState(outState);
+		Log.i(TAG, "Activity state is being saved");
+		outState.putLong(STATE_PLAYER_POSITION, this.playerPosition);
+		outState.putInt(STATE_ORIG_BACKLIGHT, this.origBrightnessSetting);
+		outState.putString(STATE_DASH_MANIFEST, this.dashManifestUrl);
+	}
 
 	@Override
 	public void onPause() {
@@ -265,7 +300,7 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			player.setBackgrounded(true);
 		}
 		
-		setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
+		setBackgroundTaskState(BackgroundTaskState.PAUSE);
 	}
 	
 	@Override
@@ -290,7 +325,7 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		
 		releasePlayer();
 		
-		setBackgroundTaskMode(BackgroundTaskMode.STOP);
+		setBackgroundTaskState(BackgroundTaskState.STOP);
 	}
 	
 	@Override
@@ -345,7 +380,6 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			
 			Runnable r = new Runnable() {
 				public void run() {
-					
 					String filePath = null;
 					String msg = statusCode.toString();
 					if (statusCode == CommStatus.DownloadNotFound) {
@@ -360,6 +394,15 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 						f = new File(filePath);
 					}
 					final File ff = f;
+					
+					if (!AppSettings.DEBUG
+							&& statusCode == CommStatus.DownloadNotFound
+							|| statusCode == CommStatus.DownloadOk) {
+						// Not in debug and not an error code, so just go...
+						beginPlayingVideo(ff, RequestFileCallback.this.progress);
+						return;
+					}
+					
 					OnDismissListener odl = new OnDismissListener() {
 						@Override
 						public void onDismiss(DialogInterface dialog) {
@@ -381,7 +424,20 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		}
 	}
 	
-	private void beginPlayingVideo(final File dimmingFile, final ProgressDialog progress) {
+	private void beginPlayingVideo(final File dimmingFile, ProgressDialog progress) {
+		Log.d(TAG, "beginPlayingVideo");
+		
+		if (progress == null) {
+			ProgressDialog d = new ProgressDialog(PlayVideoActivity.this);
+			d.setTitle("Preparing");
+			d.setMessage("Please Wait...");
+			d.setIndeterminate(true);
+			d.show();
+			progress = d;
+		}
+		
+		final ProgressDialog prog = progress;
+		
 		Thread t = new Thread() {
 			public void run() {
 				if (dimmingFile != null) {
@@ -389,18 +445,31 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 						// File parsing error.
 						mode = Mode.Analysis;
 					} else {
+						// Dimming file is prepared and ready.
 						mode = Mode.Playback;
 					}
 				} else {
+					// No dimming file yet.
 					mode = Mode.Analysis;
 				}
-				player.setPlayWhenReady(true);
-				if (progress != null) {
-					progress.dismiss();
+				setPlayWhenReady();
+				if (prog != null) {
+					prog.dismiss();
 				}
 			}
 		};
 		t.start();
+	}
+	
+	private void setPlayWhenReady() {
+		if (isAnalysisMode()) {
+			// In analysis mode... do not allow changes to orientation.
+			setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+			setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_NOSENSOR);
+		}
+		if (player != null) {
+			player.setPlayWhenReady(true);
+		}
 	}
 
 	/**
@@ -422,8 +491,10 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 				
 			} else {
 				// Play video using DASH streaming:
-				String dashManifestURL = VideoUrlProcessor.getDashUrl(this, videoId);
-				rb = new ExoDashRendererBuilder(getUserAgent(this), dashManifestURL, videoId, drmCallback, null);
+				if (dashManifestUrl == null) {
+					dashManifestUrl = VideoUrlProcessor.getDashUrl(this, videoId);
+				}
+				rb = new ExoDashRendererBuilder(getUserAgent(this), dashManifestUrl, videoId, drmCallback, null);
 			}
 			
 			player = new CustomPlayer(rb, this);
@@ -444,25 +515,26 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		player.setPlayWhenReady(false);
 	}
 	
-	public enum BackgroundTaskMode {
+	public enum BackgroundTaskState {
 		RUN,
 		PAUSE,
 		STOP;
 	}
 	
-	private void setBackgroundTaskMode(BackgroundTaskMode mode) {
-		switch(mode) {
+	private void setBackgroundTaskState(BackgroundTaskState state) {
+		switch(state) {
 		case RUN:
 			// Set-up background processing.
 			if (backgroundTaskTimer == null) {
 				backgroundTaskTimer = new Timer();
-				if (this.mode == Mode.Analysis) {
+				if (isAnalysisMode()) {
+					// Prepare the video processing task.
 					VideoProcessingTask t = new VideoProcessingTask(PlayVideoActivity.this, surfaceView);
 					backgroundTask = t;
 					
 					backgroundTaskTimer.schedule(t, 100, t.getCycleTime());
-				} else if (this.mode == Mode.Playback) {
-
+				} else if (isPlaybackMode()) {
+					// Should have already been prepared for us...
 					FrameAnalysisPlayback t = (FrameAnalysisPlayback) backgroundTask;
 					
 					backgroundTaskTimer.schedule(t, 100, t.getCycleTime());
@@ -633,6 +705,14 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 		}
 		return super.onOptionsItemSelected(item);
 	}
+	
+	private boolean isAnalysisMode() {
+		return this.mode == Mode.Analysis;
+	}
+	
+	private boolean isPlaybackMode() {
+		return this.mode == Mode.Playback;
+	}
 
 	/**
 	 * TODO: drm handling.
@@ -697,19 +777,19 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			break;
 		case ExoPlayer.STATE_BUFFERING:
 			// Probably waiting for data to come in on the stream.
-			setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
+			setBackgroundTaskState(BackgroundTaskState.PAUSE);
 			break;
 		case ExoPlayer.STATE_READY:
 			if (playWhenReady) {
 				// Starting to play.
-				setBackgroundTaskMode(BackgroundTaskMode.RUN);
+				setBackgroundTaskState(BackgroundTaskState.RUN);
 			} else {
 				// Paused.
-				setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
+				setBackgroundTaskState(BackgroundTaskState.PAUSE);
 			}
 			break;
 		case ExoPlayer.STATE_ENDED:
-			setBackgroundTaskMode(BackgroundTaskMode.PAUSE);
+			setBackgroundTaskState(BackgroundTaskState.PAUSE);
 			
 			if (backgroundTask instanceof VideoProcessingTask) {
 				// Done playing...

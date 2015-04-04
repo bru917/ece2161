@@ -15,7 +15,7 @@ public final class AppSettings {
 	/**
 	 * When enabled, debug messages are output.
 	 */
-	public static final boolean DEBUG = true;
+	public static final boolean DEBUG = false;
 	
 	private String storageFolder;
 	
