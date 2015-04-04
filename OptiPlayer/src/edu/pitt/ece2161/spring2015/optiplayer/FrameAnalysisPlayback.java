@@ -11,7 +11,7 @@ import android.util.Log;
  * 
  * @author Brian Rupert
  */
-public class FrameAnalysisPlayback extends TimerTask implements VideoBackgroundTask {
+class FrameAnalysisPlayback extends TimerTask implements VideoBackgroundTask {
 	
 	public static final int PROCESSING_INTERVAL_MS = 100;
 	
@@ -51,7 +51,8 @@ public class FrameAnalysisPlayback extends TimerTask implements VideoBackgroundT
 			return;
 		}
 		
-		int brightnessValue = FrameAnalyzer.getBrightness(entry.getLevel());
+		final int level = entry.getLevel();
+		final int brightnessValue = FrameAnalyzer.getBrightness(level);
 		//Log.d(TAG, "Got brightness " + brightnessValue);
 		
 		if (lastValue != brightnessValue) {
@@ -62,6 +63,16 @@ public class FrameAnalysisPlayback extends TimerTask implements VideoBackgroundT
 					Settings.System.SCREEN_BRIGHTNESS, brightnessValue);
 			
 			lastValue = brightnessValue;
+			
+			if (AppSettings.DEBUG) {
+				context.runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						context.updateDebugText("Mode: Playback   Level: " + level
+								+ "  Brightness: " + brightnessValue);
+					}
+				});
+			}
 		}
 	}
 
