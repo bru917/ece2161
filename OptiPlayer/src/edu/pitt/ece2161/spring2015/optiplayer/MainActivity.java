@@ -7,9 +7,6 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
-import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
