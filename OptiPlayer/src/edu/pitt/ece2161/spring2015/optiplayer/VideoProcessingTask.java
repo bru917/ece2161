@@ -104,8 +104,7 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 		}
 		
 		if (AppSettings.DEBUG) {
-			int brightness = FrameAnalyzer.getBrightness(this.lastLevel);
-			playerView.setDebugText("Mode: Analysis   Level: " + this.lastLevel + "  Brightness: " + brightness);
+			playerView.setDebugText(DebugUtil.printDebug(true, this.lastLevel));
 		}
 		
 		//Log.d(TAG, "doWork() on thread " + getCurrentThreadName());

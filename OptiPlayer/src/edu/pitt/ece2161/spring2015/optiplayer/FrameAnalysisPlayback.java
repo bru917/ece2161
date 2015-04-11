@@ -68,8 +68,7 @@ class FrameAnalysisPlayback extends TimerTask implements VideoBackgroundTask {
 				context.runOnUiThread(new Runnable() {
 					@Override
 					public void run() {
-						context.updateDebugText("Mode: Playback   Level: " + level
-								+ "  Brightness: " + brightnessValue);
+						context.updateDebugText(DebugUtil.printDebug(false, level));
 					}
 				});
 			}

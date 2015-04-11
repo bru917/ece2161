@@ -65,7 +65,7 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		
 		if (AppSettings.DEBUG) {
 			// Insert text for quick debugging
-			searchInput.setText("clarkson bmw estate");
+			searchInput.setText("pittsburgh");
 		}
 	}
 	
