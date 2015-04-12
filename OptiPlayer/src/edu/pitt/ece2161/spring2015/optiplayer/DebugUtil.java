@@ -2,6 +2,12 @@ package edu.pitt.ece2161.spring2015.optiplayer;
 
 import java.text.NumberFormat;
 
+/**
+ * Debug helper functions.
+ * 
+ * @author Brian Rupert
+ * @author Mohammad Seyedzadeh
+ */
 public class DebugUtil {
 	
 	/**

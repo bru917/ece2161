@@ -13,6 +13,7 @@ import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Environment;
 import android.preference.PreferenceManager;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -37,6 +38,8 @@ import android.widget.TextView.OnEditorActionListener;
  */
 public class MainActivity extends Activity implements OnItemClickListener {
 	
+	private static final String TAG = "MainActivity";
+	
 	private VideoResultsListAdapter listAdapter;
 	
 	// Defined as static so the state is saved - not sure if thats a cheap trick.
@@ -49,6 +52,8 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
+		
+		Log.i(TAG, "Activity is being CREATED");
 		
 		PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
 		initPrefs();
@@ -77,8 +82,27 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	@Override
 	protected void onResume() {
 		super.onResume();
+		//Log.i(TAG, "Activity is being RESUMED");
 	};
-
+	
+	@Override
+	protected void onPause() {
+		super.onPause();
+		//Log.i(TAG, "Activity is being PAUSED");
+	}
+	
+	@Override
+	protected void onStop() {
+		super.onStop();
+		//Log.i(TAG, "Activity is being STOPPED");
+	}
+	
+	@Override
+	protected void onDestroy() {
+		super.onDestroy();
+		//Log.i(TAG, "Activity is being DESTROYED");
+	}
+	
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
 		// Inflate the menu; this adds items to the action bar if it is present.

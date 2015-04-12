@@ -9,6 +9,11 @@ import android.os.Looper;
 import android.provider.Settings;
 import android.util.Log;
 
+/**
+ * Class to analyze the video frame.
+ * 
+ * @author Mohammad Seyedzadeh
+ */
 public class FrameAnalyzer {
 	
 	private static final String TAG = "FrameAnalyzer";
