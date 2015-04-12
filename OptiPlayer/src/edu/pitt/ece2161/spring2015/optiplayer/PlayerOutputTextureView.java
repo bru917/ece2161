@@ -150,7 +150,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 			return null;
 		}
 		long start = 0;
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDeveloperMode()) {
 			start = System.currentTimeMillis();
 		}
 		// Ensure the buffer is reset to the start.
@@ -170,7 +170,7 @@ public class PlayerOutputTextureView extends TextureView implements CustomView {
 		// Copy the pixels into the bitmap.
 		bmp.copyPixelsFromBuffer(mPixelBuf);
 		
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDeveloperMode()) {
 			long time = System.currentTimeMillis() - start;
 			Log.d(TAG, "Screen capture completed in " + time + "ms");
 		}

@@ -8,9 +8,11 @@ import com.google.api.client.googleapis.json.GoogleJsonResponseException;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
 import android.os.Environment;
+import android.preference.PreferenceManager;
 import android.view.KeyEvent;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -48,6 +50,9 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 		
+		PreferenceManager.setDefaultValues(this, R.xml.preferences, false);
+		initPrefs();
+		
 		listAdapter = new VideoResultsListAdapter();
 		
 		ListView listView = (ListView) findViewById(R.id.searchList);
@@ -63,7 +68,7 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			}
 		});
 		
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDebugMode() && savedInstanceState == null) {
 			// Insert text for quick debugging
 			searchInput.setText("pittsburgh");
 		}
@@ -72,7 +77,6 @@ public class MainActivity extends Activity implements OnItemClickListener {
 	@Override
 	protected void onResume() {
 		super.onResume();
-		
 	};
 
 	@Override
@@ -89,6 +93,8 @@ public class MainActivity extends Activity implements OnItemClickListener {
 		// as you specify a parent activity in AndroidManifest.xml.
 		int id = item.getItemId();
 		if (id == R.id.action_settings) {
+			Intent intent = new Intent(this, SettingsActivity.class);
+			startActivity(intent);
 			return true;
 		}
 		return super.onOptionsItemSelected(item);
@@ -251,6 +257,14 @@ public class MainActivity extends Activity implements OnItemClickListener {
 			return convertView;
 		}
 		
+	}
+	
+	/**
+	 * Initialize application based on the inital value of the settings.
+	 */
+	private void initPrefs() {
+		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+		AppSettings.getInstance().setDebugMode(prefs.getBoolean(SettingsActivity.KEY_PREF_DEBUGMODE, false));
 	}
 	
 	private static String formatDuration(Long duration) {

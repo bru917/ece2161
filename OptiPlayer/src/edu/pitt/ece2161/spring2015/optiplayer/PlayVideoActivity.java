@@ -161,7 +161,7 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			}
 		});
 		
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDebugMode()) {
 			debugText = (TextView) this.findViewById(R.id.tDebugText);
 			debugText.setVisibility(View.VISIBLE);
 		}
@@ -180,24 +180,22 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 			if (localFile.exists()) {
 				Log.d(TAG, "Found cached file");
 				
-				if (AppSettings.DEBUG) {
-					if (savedInstanceState == null) {
-						// Begin playback on dismissal of the dialog.
-						OnDismissListener odl = new OnDismissListener() {
-							@Override
-							public void onDismiss(DialogInterface dialog) {
-								beginPlayingVideo(localFile, null);
-							}
-						};
-						
-						new AlertDialog.Builder(PlayVideoActivity.this)
-							.setTitle("Dimming Information")
-							.setMessage("Reading locally cached dimming file")
-							.setCancelable(false)
-							.setPositiveButton("Play", null)
-							.setOnDismissListener(odl)
-							.show();
-					}
+				if (AppSettings.getInstance().isDebugMode() && savedInstanceState == null) {
+					// Begin playback on dismissal of the dialog.
+					OnDismissListener odl = new OnDismissListener() {
+						@Override
+						public void onDismiss(DialogInterface dialog) {
+							beginPlayingVideo(localFile, null);
+						}
+					};
+					
+					new AlertDialog.Builder(PlayVideoActivity.this)
+						.setTitle("Dimming Information")
+						.setMessage("Reading locally cached dimming file")
+						.setCancelable(false)
+						.setPositiveButton("Play", null)
+						.setOnDismissListener(odl)
+						.show();
 				} else {
 					beginPlayingVideo(localFile, null);
 				}
@@ -395,7 +393,7 @@ implements CustomPlayer.ActivityCallback, ExoPlayer.Listener {
 					}
 					final File ff = f;
 					
-					if (!AppSettings.DEBUG
+					if (!AppSettings.getInstance().isDebugMode()
 							&& statusCode == CommStatus.DownloadNotFound
 							|| statusCode == CommStatus.DownloadOk) {
 						// Not in debug and not an error code, so just go...

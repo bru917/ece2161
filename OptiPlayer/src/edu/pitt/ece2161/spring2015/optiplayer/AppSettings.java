@@ -12,12 +12,9 @@ import android.os.Environment;
  */
 public final class AppSettings {
 	
-	/**
-	 * When enabled, debug messages are output.
-	 */
-	public static final boolean DEBUG = false;
-	
 	private String storageFolder;
+	
+	private boolean debugMode;
 	
 	private static AppSettings instance;
 	
@@ -39,5 +36,17 @@ public final class AppSettings {
 	public File getLocalAnalysisFile(String videoId) {
 		File f = new File(this.storageFolder + "/opt_" + videoId + ".txt");
 		return f;
+	}
+	
+	void setDebugMode(boolean b) {
+		this.debugMode = b;
+	}
+	
+	public boolean isDebugMode() {
+		return debugMode;
+	}
+	
+	public boolean isDeveloperMode() {
+		return true;
 	}
 }

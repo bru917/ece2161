@@ -103,7 +103,7 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 			return;
 		}
 		
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDebugMode()) {
 			playerView.setDebugText(DebugUtil.printDebug(true, this.lastLevel));
 		}
 		
@@ -119,7 +119,7 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 		} catch (Exception e) {
 			Log.e(TAG, e.toString());
 		}
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDeveloperMode()) {
 			long timeNs = System.nanoTime() - start;
 			double timeMs = timeNs / 1000000;
 			Log.v(TAG, "Spent " + NumberFormat.getNumberInstance().format(timeMs) + "ms on UI thread");
@@ -170,14 +170,14 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 				return;
 			}
 			CaptureData capData = (CaptureData) msg.obj;
-			if (AppSettings.DEBUG) {
+			if (AppSettings.getInstance().isDeveloperMode()) {
 				Log.v(TAG, "Got bitmap from message, starting analysis on thread " + getCurrentThreadName());
 			}
 			parent.lastLevel = parent.analyzer.analyze(capData.getBitmap(), capData.getPosition());
 			// Need to release the resources used for the bitmap.
 			capData.getBitmap().recycle();
 			
-			if (AppSettings.DEBUG) {
+			if (AppSettings.getInstance().isDebugMode()) {
 				// Keep a running average of the time it took to process the frame.
 				long time = System.nanoTime() - start;
 				avgProcessingTime = (avgProcessingTime * avgProcessingCount + time) / (avgProcessingCount + 1);
@@ -188,7 +188,7 @@ class VideoProcessingTask extends TimerTask implements VideoBackgroundTask {
 		private void cancel() {
 			this.removeCallbacksAndMessages(null);
 			
-			if (AppSettings.DEBUG) {
+			if (AppSettings.getInstance().isDebugMode()) {
 				Log.i(TAG, "Average frame processing time is "
 						+ NumberFormat.getNumberInstance().format(avgProcessingTime / 1000000)
 						+ "ms over " + avgProcessingCount + " cycles.");

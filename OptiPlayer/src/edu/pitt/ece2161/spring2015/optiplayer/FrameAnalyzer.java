@@ -33,7 +33,7 @@ public class FrameAnalyzer {
 	public int analyze(Bitmap img, long currentPositionMs) {
 		long start = 0;
 		
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDeveloperMode()) {
 			start = System.currentTimeMillis();
 			if (Looper.myLooper() == Looper.getMainLooper()) {
 				// Note that we should AVOID running this on the main thread
@@ -58,7 +58,7 @@ public class FrameAnalyzer {
 		// The Minimum Backlight is 10 and the Maximum Backlight is 255;
 		int brightness = getBrightness(level);
 		
-		if (AppSettings.DEBUG) {
+		if (AppSettings.getInstance().isDeveloperMode()) {
 			long time = System.currentTimeMillis() - start;
 			Log.d(TAG, "Analysis done! "
 					+ "duration=" + time + "ms, "

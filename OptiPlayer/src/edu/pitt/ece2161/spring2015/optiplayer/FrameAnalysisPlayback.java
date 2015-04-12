@@ -64,7 +64,7 @@ class FrameAnalysisPlayback extends TimerTask implements VideoBackgroundTask {
 			
 			lastValue = brightnessValue;
 			
-			if (AppSettings.DEBUG) {
+			if (AppSettings.getInstance().isDebugMode()) {
 				context.runOnUiThread(new Runnable() {
 					@Override
 					public void run() {
